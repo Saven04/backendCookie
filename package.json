@@ -1,0 +1,25 @@
+{
+  "name": "cookie-compliance-backend",
+  "version": "1.0.0",
+  "description": "Backend for cookie compliance project",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "moment-timezone": "^0.5.47",
+    "mongoose": "^6.13.8",
+    "passport": "^0.7.0",
+    "passport-facebook": "^3.0.0",
+    "passport-google-oauth20": "^2.0.0",
+    "uuid": "^11.0.5"
+  },
+  "author": "Your Name",
+  "license": "ISC"
+}

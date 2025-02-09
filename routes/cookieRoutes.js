@@ -2,9 +2,11 @@ const express = require("express");
 const { saveCookiePreferences } = require("../controllers/cookieController");
 const { saveLocationData } = require("../controllers/locationController");
 const crypto = require("crypto");
+const requestIp = require("request-ip"); // ✅ Import request-ip
 
 const router = express.Router();
 router.use(express.json()); // Middleware to parse JSON
+router.use(requestIp.mw()); // ✅ Middleware to auto-extract client IP
 
 // Generate a short consent ID (only if necessary)
 const generateShortId = () => {
@@ -15,7 +17,7 @@ const generateShortId = () => {
                 .slice(0, 8);
 };
 
-// 👉 **Updated POST Route to Save Cookie Preferences**
+// 👉 **POST Route to Save Cookie Preferences**
 router.post("/save", async (req, res) => {
     try {
         console.log("Received request body:", req.body);
@@ -43,7 +45,6 @@ router.post("/save", async (req, res) => {
         // Save to database
         await saveCookiePreferences(consentId, preferences);
 
-        // ✅ **Return the same `consentId` to be used for location data**
         res.status(200).json({ 
             message: "Cookie preferences saved successfully.",
             consentId
@@ -61,20 +62,24 @@ router.post("/save", async (req, res) => {
 // 👉 **Updated POST Route to Save Location Data**
 router.post("/location", async (req, res) => {
     try {
-        let { consentId, ipAddress, isp, city, country, latitude, longitude } = req.body;
+        let { consentId, isp, city, country, latitude, longitude } = req.body;
 
         if (!consentId) {
             return res.status(400).json({ message: "Missing consent ID." });
         }
 
+        // ✅ Get real user IP from request
+        const clientIp = requestIp.getClientIp(req);
+        console.log("✅ Real Client IP:", clientIp);
+
         // Validate required fields
-        if (!ipAddress || !isp || !city || !country) {
-            return res.status(400).json({ message: "IP address, ISP, city, and country are required." });
+        if (!isp || !city || !country) {
+            return res.status(400).json({ message: "ISP, city, and country are required." });
         }
 
         // Validate data types
-        if ([ipAddress, isp, city, country].some(field => typeof field !== "string")) {
-            return res.status(400).json({ message: "IP address, ISP, city, and country must be strings." });
+        if ([isp, city, country].some(field => typeof field !== "string")) {
+            return res.status(400).json({ message: "ISP, city, and country must be strings." });
         }
 
         // Validate latitude and longitude (if provided)
@@ -86,14 +91,8 @@ router.post("/location", async (req, res) => {
             return res.status(400).json({ message: "Longitude must be a valid number." });
         }
 
-        // Validate IP address format
-        const ipRegex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-        if (!ipRegex.test(ipAddress)) {
-            return res.status(400).json({ message: "Invalid IP address format." });
-        }
-
         // Save location data
-        await saveLocationData({ consentId, ipAddress, isp, city, country, latitude, longitude });
+        await saveLocationData({ consentId, ipAddress: clientIp, isp, city, country, latitude, longitude });
 
         res.status(200).json({ message: "Location data saved successfully." });
     } catch (error) {

@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const axios = require("axios"); // ✅ Import axios for API requests
+const requestIp = require("request-ip");
 
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");

@@ -43,19 +43,38 @@ app.use("/api", cookieRoutes);
 app.use("/api/auth", authRoutes);
 
 // ✅ Route to get the real client IP
-app.get("/api/get-ipinfo", (req, res) => {
-  try {
-    const clientIp = req.clientIp; // ✅ Get real IP from request-ip middleware
+app.get("/api/get-ipinfo", async (req, res) => {
+    try {
+        // Get IP from request
+        let clientIp = requestIp.getClientIp(req) || "Unknown";
+        
+        // Convert IPv6-mapped IPv4 addresses (e.g., "::ffff:192.168.1.1") to IPv4
+        if (clientIp.includes("::ffff:")) {
+            clientIp = clientIp.split("::ffff:")[1];
+        }
 
-    if (!clientIp) {
-      return res.status(500).json({ error: "Could not determine IP address" });
+        console.log("📌 Detected Client IP:", clientIp);
+
+        // Fetch additional details using ipinfo.io
+        const response = await axios.get(`https://ipinfo.io/${clientIp}/json?token=${process.env.IPINFO_TOKEN}`);
+        
+        if (!response.data) {
+            return res.status(500).json({ error: "Failed to fetch IP info" });
+        }
+
+        // Send response with IP and location
+        res.json({
+            ip: clientIp, // ✅ Ensures correct IPv4 address is sent
+            city: response.data.city || "Unknown",
+            region: response.data.region || "Unknown",
+            country: response.data.country || "Unknown",
+            org: response.data.org || "Unknown"
+        });
+
+    } catch (error) {
+        console.error("❌ Error fetching IP info:", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
     }
-
-    res.json({ ip: clientIp }); // ✅ Returns the real client IP in JSON format
-  } catch (error) {
-    console.error("❌ Error fetching IP:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
 });
 
 // Health check route

@@ -3,8 +3,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const bodyParser = require("body-parser");
-const axios = require("axios"); // ✅ Import axios for API requests
-const requestIp = require("request-ip");
+const requestIp = require("request-ip"); // ✅ Correct way to get real client IP
 
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
@@ -13,6 +12,7 @@ const app = express();
 
 // Middleware
 app.use(bodyParser.json());
+app.use(requestIp.mw()); // ✅ Middleware to capture client IP
 
 // CORS Configuration
 const allowedOrigins = ["https://t10hits.netlify.app"];
@@ -42,19 +42,19 @@ connectDB();
 app.use("/api", cookieRoutes);
 app.use("/api/auth", authRoutes);
 
-// ✅ Fix: Ensure `/api/get-ipinfo` always returns JSON
-app.get("/api/get-ipinfo", async (req, res) => {
+// ✅ Route to get the real client IP
+app.get("/api/get-ipinfo", (req, res) => {
   try {
-    const response = await axios.get("https://ipinfo.io/json");
+    const clientIp = req.clientIp; // ✅ Get real IP from request-ip middleware
 
-    if (!response.data) {
-      return res.status(500).json({ error: "Failed to fetch IP info" });
+    if (!clientIp) {
+      return res.status(500).json({ error: "Could not determine IP address" });
     }
 
-    res.json(response.data); // ✅ Ensures JSON response
+    res.json({ ip: clientIp }); // ✅ Returns the real client IP in JSON format
   } catch (error) {
-    console.error("❌ Error fetching IP info:", error.message);
-    res.status(500).json({ error: "Internal Server Error" }); // ✅ Prevents HTML responses
+    console.error("❌ Error fetching IP:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 

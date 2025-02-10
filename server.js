@@ -43,7 +43,7 @@ connectDB();
 app.use("/api", cookieRoutes);
 app.use("/api/auth", authRoutes);
 
-// ✅ Route to get the real client IP and fetch geolocation data from `ipwhois.io`
+// ✅ Route to get the real client IP and fetch geolocation data from `ip-api.com`
 app.get("/api/get-ipinfo", async (req, res) => {
     try {
         let clientIp = requestIp.getClientIp(req) || "Unknown";
@@ -55,18 +55,14 @@ app.get("/api/get-ipinfo", async (req, res) => {
 
         console.log("📌 Detected Client IP:", clientIp);
 
-        // Fetch geolocation data from `ipwhois.io`
-        const response = await axios.get(`https://ipwhois.app/json/${clientIp}?key=${process.env.IPWHOIS_API_KEY}`);
-
-        if (!response.data.success) {
-            return res.status(500).json({ error: "Failed to fetch IP info", details: response.data });
-        }
+        // Fetch geolocation data from `ip-api.com`
+        const response = await axios.get(`http://ip-api.com/json/${clientIp}`);
 
         // Send response with IP and location
         res.json({
             ip: clientIp, // ✅ Ensures correct IPv4 address is sent
             city: response.data.city || "Unknown",
-            region: response.data.region || "Unknown",
+            region: response.data.regionName || "Unknown",
             country: response.data.country || "Unknown",
             isp: response.data.isp || "Unknown",
         });

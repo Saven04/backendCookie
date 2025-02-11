@@ -21,15 +21,10 @@ const cookiePreferencesSchema = new mongoose.Schema(
         socialMedia: false,
       },
     },
-    ipAddress: {
-      type: String,
-      required: [true, "IP address is required."], // Ensure IP is always stored
-      trim: true,
-    },
     createdAt: {
       type: Date,
       default: () => moment().tz("Asia/Kolkata").toDate(), // Save in IST
-      expires: 365 * 24 * 60 * 60, // Automatically delete records after 365 days
+      expires: 365 * 24 * 60 * 60, // Auto-delete after 365 days
     },
   },
   {

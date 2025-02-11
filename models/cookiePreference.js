@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const moment = require("moment-timezone");
 
-// Define the schema for cookie preferences
+// Define schema for storing user cookie preferences
 const cookiePreferencesSchema = new mongoose.Schema(
   {
     consentId: {
@@ -11,17 +11,25 @@ const cookiePreferencesSchema = new mongoose.Schema(
       trim: true,
     },
     preferences: {
-      strictlyNecessary: { type: Boolean, required: true, default: true },
-      performance: { type: Boolean, required: true, default: false },
-      functional: { type: Boolean, required: true, default: false },
-      advertising: { type: Boolean, required: true, default: false },
-      socialMedia: { type: Boolean, required: true, default: false },
+      type: Object,
+      required: true,
+      default: {
+        strictlyNecessary: true,
+        performance: false,
+        functional: false,
+        advertising: false,
+        socialMedia: false,
+      },
     },
-    ipAddress: { type: String, required: true }, // Store IP address for logging
+    ipAddress: {
+      type: String,
+      required: [true, "IP address is required."], // Ensure IP is always stored
+      trim: true,
+    },
     createdAt: {
       type: Date,
-      default: () => moment().tz("Asia/Kolkata").toDate(), // Store timestamp in IST
-      expires: "365d", // Auto-delete after 365 days
+      default: () => moment().tz("Asia/Kolkata").toDate(), // Save in IST
+      expires: 365 * 24 * 60 * 60, // Automatically delete records after 365 days
     },
   },
   {
@@ -29,16 +37,16 @@ const cookiePreferencesSchema = new mongoose.Schema(
   }
 );
 
-// Convert timestamps to IST in API responses
-cookiePreferencesSchema.methods.toJSON = function () {
-  const obj = this.toObject();
-  obj.createdAt = moment(obj.createdAt).tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss");
-  obj.updatedAt = moment(obj.updatedAt).tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss");
-  return obj;
-};
+// Convert timestamps to IST when returning JSON responses
+cookiePreferencesSchema.set("toJSON", {
+  transform: function (doc, ret) {
+    ret.createdAt = moment(ret.createdAt).tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss");
+    ret.updatedAt = moment(ret.updatedAt).tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss");
+    return ret;
+  },
+});
 
-// Create the Mongoose model
+// Create Mongoose model
 const CookiePreferences = mongoose.model("CookiePreferences", cookiePreferencesSchema);
 
-// Export the model
 module.exports = CookiePreferences;

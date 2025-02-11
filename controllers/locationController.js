@@ -1,5 +1,5 @@
 const axios = require("axios");
-const LocationData = require("../models/LocationModel");
+const LocationData = require("../models/locationData");
 
 const getPublicIPData = async () => {
     try {

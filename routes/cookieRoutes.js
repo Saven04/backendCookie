@@ -10,20 +10,21 @@ router.use(requestIp.mw()); // Auto-extract client IP
 
 // Generate a short consent ID (only if necessary)
 const generateShortId = () => {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    const bytes = crypto.randomBytes(6);
-    return bytes.toString("base64")
-                .replace(/[+/=]/g, "") 
-                .slice(0, 8);
+    return crypto.randomBytes(6).toString("base64").replace(/[+/=]/g, "").slice(0, 8);
 };
 
 // 👉 **POST Route to Save Cookie Preferences**
 router.post("/save", async (req, res) => {
     try {
         console.log("Received request body:", req.body);
-
+        
         let { consentId, preferences } = req.body;
         const ipAddress = requestIp.getClientIp(req); // Extract client IP
+
+        // Ensure IP address is available
+        if (!ipAddress) {
+            return res.status(400).json({ message: "Unable to determine IP address." });
+        }
 
         // Generate a consent ID if missing
         if (!consentId) {
@@ -55,7 +56,6 @@ router.post("/save", async (req, res) => {
             message: "Cookie preferences saved successfully.",
             consentId
         });
-
     } catch (error) {
         console.error("❌ Error saving cookie preferences:", error);
         res.status(500).json({
@@ -94,13 +94,16 @@ router.delete("/delete/:consentId", async (req, res) => {
 router.post("/location", async (req, res) => {
     try {
         let { consentId, isp, city, country, latitude, longitude } = req.body;
+        const clientIp = requestIp.getClientIp(req);
 
         if (!consentId) {
             return res.status(400).json({ message: "Missing consent ID." });
         }
 
-        // ✅ Get real user IP from request
-        const clientIp = requestIp.getClientIp(req);
+        if (!clientIp) {
+            return res.status(400).json({ message: "Unable to determine IP address." });
+        }
+
         console.log("✅ Real Client IP:", clientIp);
 
         // Validate required fields

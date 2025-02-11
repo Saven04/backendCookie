@@ -3,7 +3,7 @@ const LocationData = require("../models/LocationModel");
 
 const getPublicIPData = async () => {
     try {
-        const response = await axios.get("https://api.ipdata.co/?api-key=YOUR_API_KEY");
+        const response = await axios.get("https://api.ipdata.co/?api-key=d2e46351214782d552f706203cb424955384bc556f56ff01dd166651");
         return response.data;
     } catch (error) {
         console.error("Error fetching IP data:", error);

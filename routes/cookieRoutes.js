@@ -1,12 +1,12 @@
 const express = require("express");
-const { saveCookiePreferences } = require("../controllers/cookieController");
+const { saveCookiePreferences, deleteCookiePreferences } = require("../controllers/cookieController");
 const { saveLocationData } = require("../controllers/locationController");
 const crypto = require("crypto");
-const requestIp = require("request-ip"); // ✅ Import request-ip
+const requestIp = require("request-ip");
 
 const router = express.Router();
 router.use(express.json()); // Middleware to parse JSON
-router.use(requestIp.mw()); // ✅ Middleware to auto-extract client IP
+router.use(requestIp.mw()); // Auto-extract client IP
 
 // Generate a short consent ID (only if necessary)
 const generateShortId = () => {
@@ -23,13 +23,19 @@ router.post("/save", async (req, res) => {
         console.log("Received request body:", req.body);
 
         let { consentId, preferences } = req.body;
+        const ipAddress = requestIp.getClientIp(req); // Extract client IP
 
-        // If consentId is not provided, generate a new one
+        // Generate a consent ID if missing
         if (!consentId) {
             consentId = generateShortId();
         }
 
-        // Validate preferences
+        // Validate Consent ID Format
+        if (typeof consentId !== "string" || consentId.length < 5) {
+            return res.status(400).json({ message: "Invalid Consent ID format." });
+        }
+
+        // Validate Preferences Object
         if (!preferences || typeof preferences !== "object" || Array.isArray(preferences)) {
             return res.status(400).json({ message: "Invalid or missing preferences object." });
         }
@@ -43,7 +49,7 @@ router.post("/save", async (req, res) => {
         }
 
         // Save to database
-        await saveCookiePreferences(consentId, preferences);
+        await saveCookiePreferences(consentId, preferences, ipAddress);
 
         res.status(200).json({ 
             message: "Cookie preferences saved successfully.",
@@ -51,10 +57,35 @@ router.post("/save", async (req, res) => {
         });
 
     } catch (error) {
-        console.error("Error saving cookie preferences:", error);
+        console.error("❌ Error saving cookie preferences:", error);
         res.status(500).json({
             message: "Failed to save cookie preferences.",
             error: error.message || "Unknown error",
+        });
+    }
+});
+
+// 👉 **DELETE Route to Manually Remove User Consent & Data**
+router.delete("/delete/:consentId", async (req, res) => {
+    try {
+        const { consentId } = req.params;
+
+        if (!consentId) {
+            return res.status(400).json({ message: "Missing consent ID." });
+        }
+
+        const result = await deleteCookiePreferences(consentId);
+
+        if (!result) {
+            return res.status(404).json({ message: "No data found for the given Consent ID." });
+        }
+
+        res.status(200).json({ message: "Cookie preferences deleted successfully." });
+    } catch (error) {
+        console.error("❌ Error deleting cookie preferences:", error);
+        res.status(500).json({ 
+            message: "Failed to delete cookie preferences.", 
+            error: error.message || "Unknown error" 
         });
     }
 });
@@ -96,7 +127,7 @@ router.post("/location", async (req, res) => {
 
         res.status(200).json({ message: "Location data saved successfully." });
     } catch (error) {
-        console.error("Error saving location data:", error);
+        console.error("❌ Error saving location data:", error);
         res.status(500).json({
             message: "Failed to save location data.",
             error: error.message || "Unknown error",

@@ -1,5 +1,5 @@
 const requestIp = require("request-ip");
-const LocationData = require("../models/LocationModel");
+const LocationData = require("../models/locationData");
 
 // 📌 Function to Anonymize IP (Remove Last Octet)
 function anonymizeIP(ip) {

@@ -1,46 +1,54 @@
-const Location = require("../models/locationData");
+const requestIp = require("request-ip");
+const LocationData = require("../models/LocationModel");
 
-// Function to save or update location data
-const saveLocationData = async ({ consentId, ipAddress, isp, city, country, latitude, longitude }) => {
-    try {
-        if (!consentId || !ipAddress || !isp || !city || !country) {
-            throw new Error("Missing required fields: consentId, ipAddress, isp, city, and country are mandatory.");
-        }
+// 📌 Function to Anonymize IP (Remove Last Octet)
+function anonymizeIP(ip) {
+  if (!ip) return null;
+  
+  // IPv4: Replace last octet (e.g., 192.168.1.25 → 192.168.1.XXX)
+  if (ip.includes(".")) {
+    return ip.replace(/\d+$/, "XXX");
+  }
+  
+  // IPv6: Truncate the address (e.g., 2001:db8::ff00:42:8329 → 2001:db8::ff00:42:XXXX)
+  return ip.split(":").slice(0, -1).join(":") + ":XXXX";
+}
 
-        console.log(`🔹 Processing Location Data for Consent ID: ${consentId}`);
+// 📌 Save Location Data with Anonymized IP
+const saveLocationData = async (req, res) => {
+  try {
+    const clientIp = requestIp.getClientIp(req); // Get user's IP
 
-        // Validate data types
-        if (typeof consentId !== "string" || consentId.length < 5) {
-            throw new Error("Invalid Consent ID format.");
-        }
-        if ([isp, city, country].some(field => typeof field !== "string")) {
-            throw new Error("ISP, city, and country must be strings.");
-        }
-        if (latitude !== undefined && (typeof latitude !== "number" || isNaN(latitude))) {
-            throw new Error("Latitude must be a valid number.");
-        }
-        if (longitude !== undefined && (typeof longitude !== "number" || isNaN(longitude))) {
-            throw new Error("Longitude must be a valid number.");
-        }
-
-        // Check if location data for the same consentId already exists
-        let locationData = await Location.findOne({ consentId });
-
-        if (locationData) {
-            console.log("🔄 Updating existing location data...");
-            Object.assign(locationData, { ipAddress, isp, city, country, latitude, longitude });
-            await locationData.save();
-            return { message: "Location data updated successfully.", consentId };
-        } else {
-            console.log("✅ Saving new location data...");
-            locationData = new Location({ consentId, ipAddress, isp, city, country, latitude, longitude });
-            await locationData.save();
-            return { message: "Location data saved successfully.", consentId };
-        }
-    } catch (error) {
-        console.error("❌ Error saving location data:", error.message);
-        throw new Error("Failed to save location data: " + error.message);
+    if (!clientIp) {
+      return res.status(400).json({ message: "Unable to determine IP address." });
     }
+
+    const anonymizedIP = anonymizeIP(clientIp);
+
+    const { consentId, isp, city, country, latitude, longitude } = req.body;
+
+    if (!consentId || !isp || !city || !country) {
+      return res.status(400).json({ message: "Consent ID, ISP, city, and country are required." });
+    }
+
+    // Store in Database
+    const locationData = new LocationData({
+      consentId,
+      ipAddress: anonymizedIP, // ✅ GDPR-compliant anonymized IP
+      isp,
+      city,
+      country,
+      latitude,
+      longitude,
+    });
+
+    await locationData.save();
+    res.status(200).json({ message: "Location data saved successfully." });
+
+  } catch (error) {
+    console.error("❌ Error saving location data:", error);
+    res.status(500).json({ message: "Failed to save location data.", error: error.message });
+  }
 };
 
 module.exports = { saveLocationData };

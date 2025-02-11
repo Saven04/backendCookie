@@ -8,16 +8,18 @@ const router = express.Router();
 router.use(express.json()); // Middleware to parse JSON
 router.use(requestIp.mw()); // Auto-extract client IP
 
-// Generate a short consent ID (only if necessary)
+// ✅ Generate a short Consent ID (only if missing)
 const generateShortId = () => {
-    return crypto.randomBytes(6).toString("base64").replace(/[+/=]/g, "").slice(0, 8);
+    return crypto.randomBytes(6).toString("base64")
+        .replace(/[+/=]/g, "")
+        .slice(0, 8);
 };
 
-// 👉 **POST Route to Save Cookie Preferences**
+// ✅ POST Route to Save Cookie Preferences
 router.post("/save", async (req, res) => {
     try {
-        console.log("Received request body:", req.body);
-        
+        console.log("📩 Received request body:", req.body);
+
         let { consentId, preferences } = req.body;
         const ipAddress = requestIp.getClientIp(req); // Extract client IP
 
@@ -50,11 +52,12 @@ router.post("/save", async (req, res) => {
         }
 
         // Save to database
-        await saveCookiePreferences(consentId, preferences, ipAddress);
+        const result = await saveCookiePreferences(consentId, preferences);
 
         res.status(200).json({ 
             message: "Cookie preferences saved successfully.",
-            consentId
+            consentId,
+            result
         });
     } catch (error) {
         console.error("❌ Error saving cookie preferences:", error);
@@ -65,7 +68,7 @@ router.post("/save", async (req, res) => {
     }
 });
 
-// 👉 **DELETE Route to Manually Remove User Consent & Data**
+// ✅ DELETE Route to Remove User Consent & Data
 router.delete("/delete/:consentId", async (req, res) => {
     try {
         const { consentId } = req.params;
@@ -76,11 +79,7 @@ router.delete("/delete/:consentId", async (req, res) => {
 
         const result = await deleteCookiePreferences(consentId);
 
-        if (!result) {
-            return res.status(404).json({ message: "No data found for the given Consent ID." });
-        }
-
-        res.status(200).json({ message: "Cookie preferences deleted successfully." });
+        res.status(200).json({ message: "Cookie preferences deleted successfully.", result });
     } catch (error) {
         console.error("❌ Error deleting cookie preferences:", error);
         res.status(500).json({ 
@@ -90,7 +89,7 @@ router.delete("/delete/:consentId", async (req, res) => {
     }
 });
 
-// 👉 **Updated POST Route to Save Location Data**
+// ✅ POST Route to Save Location Data
 router.post("/location", async (req, res) => {
     try {
         let { consentId, isp, city, country, latitude, longitude } = req.body;
@@ -126,9 +125,9 @@ router.post("/location", async (req, res) => {
         }
 
         // Save location data
-        await saveLocationData({ consentId, ipAddress: clientIp, isp, city, country, latitude, longitude });
+        const result = await saveLocationData({ consentId, ipAddress: clientIp, isp, city, country, latitude, longitude });
 
-        res.status(200).json({ message: "Location data saved successfully." });
+        res.status(200).json({ message: "Location data saved successfully.", result });
     } catch (error) {
         console.error("❌ Error saving location data:", error);
         res.status(500).json({

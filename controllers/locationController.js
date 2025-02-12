@@ -1,48 +1,45 @@
-const axios = require("axios");
-const LocationData = require("../models/locationData");
+const Location = require("../models/locationData");
 
-const getPublicIPData = async () => {
+// Function to save or update location data
+const saveLocationData = async ({ consentId, ipAddress, isp, city, country, latitude, longitude }) => {
     try {
-        const response = await axios.get("https://api.ipdata.co/?api-key=d2e46351214782d552f706203cb424955384bc556f56ff01dd166651");
-        return response.data;
-    } catch (error) {
-        console.error("Error fetching IP data:", error);
-        return null;
-    }
-};
-
-const saveLocationData = async (req, res) => {
-    try {
-        const ipData = await getPublicIPData();
-        if (!ipData) return res.status(500).json({ message: "Failed to retrieve IP data." });
-
-        // ✅ Anonymize the IP (Mask Last Octet)
-        const anonymizedIP = ipData.ip.replace(/\d+$/, "XXX");
-
-        const { consentId } = req.body;
-        if (!consentId) {
-            return res.status(400).json({ message: "Consent ID is required." });
+        if (!consentId || !ipAddress || !isp || !city || !country) {
+            throw new Error("Missing required fields: consentId, ipAddress, isp, city, and country are mandatory.");
         }
 
-        const locationData = new LocationData({
-            consentId,
-            ipAddress: anonymizedIP, // ✅ GDPR-compliant anonymized IP
-            isp: ipData.asn.name, 
-            city: ipData.city,
-            region: ipData.region,
-            country: ipData.country_name,
-            latitude: ipData.latitude,
-            longitude: ipData.longitude,
-            postalCode: ipData.postal,
-            timezone: ipData.timezone.name,
-        });
+        console.log(`🔹 Processing Location Data for Consent ID: ${consentId}`);
 
-        await locationData.save();
-        res.status(200).json({ message: "Location data saved successfully." });
+        // Check if location data for the same consentId already exists
+        let locationData = await Location.findOne({ consentId });
 
+        if (locationData) {
+            console.log("🔄 Updating existing location data...");
+            locationData.ipAddress = ipAddress;
+            locationData.isp = isp;
+            locationData.city = city;
+            locationData.country = country;
+            locationData.latitude = latitude;
+            locationData.longitude = longitude;
+            await locationData.save();
+            return { message: "Location data updated successfully.", consentId };
+        } else {
+            console.log("✅ Saving new location data...");
+            locationData = new Location({
+                consentId,
+                ipAddress,
+                isp,
+                city,
+                country,
+                latitude,
+                longitude,
+            });
+
+            await locationData.save();
+            return { message: "Location data saved successfully.", consentId };
+        }
     } catch (error) {
-        console.error("❌ Error saving location data:", error);
-        res.status(500).json({ message: "Failed to save location data.", error: error.message });
+        console.error("❌ Error saving location data:", error.message);
+        throw new Error("Failed to save location data: " + error.message);
     }
 };
 

@@ -89,11 +89,18 @@ router.delete("/delete/:consentId", async (req, res) => {
     }
 });
 
-// ✅ POST Route to Save Location Data
+const express = require("express");
+const requestIp = require("request-ip");
+const LocationData = require("../models/locationData"); // Ensure this path is correct
+
+const router = express.Router();
+
 router.post("/location", async (req, res) => {
     try {
-        let { consentId, isp, city, country, latitude, longitude } = req.body;
-        const clientIp = requestIp.getClientIp(req);
+        let { consentId, isp, city, region, country, latitude, longitude, postalCode, timezone } = req.body;
+        
+        // Get the client's real IP
+        const clientIp = requestIp.getClientIp(req) || req.headers["x-forwarded-for"]?.split(",")[0] || req.socket.remoteAddress;
 
         if (!consentId) {
             return res.status(400).json({ message: "Missing consent ID." });
@@ -106,13 +113,13 @@ router.post("/location", async (req, res) => {
         console.log("✅ Real Client IP:", clientIp);
 
         // Validate required fields
-        if (!isp || !city || !country) {
-            return res.status(400).json({ message: "ISP, city, and country are required." });
+        if (!isp || !city || !region || !country) {
+            return res.status(400).json({ message: "ISP, city, region, and country are required." });
         }
 
         // Validate data types
-        if ([isp, city, country].some(field => typeof field !== "string")) {
-            return res.status(400).json({ message: "ISP, city, and country must be strings." });
+        if ([isp, city, region, country, postalCode, timezone].some(field => field && typeof field !== "string")) {
+            return res.status(400).json({ message: "ISP, city, region, country, postalCode, and timezone must be strings." });
         }
 
         // Validate latitude and longitude (if provided)
@@ -124,10 +131,21 @@ router.post("/location", async (req, res) => {
             return res.status(400).json({ message: "Longitude must be a valid number." });
         }
 
-        // Save location data
-        const result = await saveLocationData({ consentId, ipAddress: clientIp, isp, city, country, latitude, longitude });
+        // Save location data to MongoDB
+        const result = await LocationData.create({
+            consentId,
+            ipAddress: clientIp,
+            isp,
+            city,
+            region,
+            country,
+            latitude,
+            longitude,
+            postalCode,
+            timezone
+        });
 
-        res.status(200).json({ message: "Location data saved successfully.", result });
+        res.status(201).json({ message: "Location data saved successfully.", result });
     } catch (error) {
         console.error("❌ Error saving location data:", error);
         res.status(500).json({
@@ -136,5 +154,8 @@ router.post("/location", async (req, res) => {
         });
     }
 });
+
+module.exports = router;
+;
 
 module.exports = router;

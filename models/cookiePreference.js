@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
 const moment = require("moment-timezone");
 
-// Define the schema for cookie preferences
 const cookiePreferencesSchema = new mongoose.Schema(
   {
     consentId: {
@@ -17,16 +16,19 @@ const cookiePreferencesSchema = new mongoose.Schema(
       advertising: { type: Boolean, required: true, default: false },
       socialMedia: { type: Boolean, required: true, default: false },
     },
-    timestamp: {
-      type: Date, 
-      default: () => moment().tz("Asia/Kolkata").toDate(),
-      expires: "730d", // Auto-delete after 2 years (GDPR compliant)
+    createdAt: {
+      type: Date,
+      default: () => moment().tz("Asia/Kolkata").toDate(), 
+      expires: 60 * 60 * 24 * 730, // Auto-delete after 2 years (730 days)
     },
   },
   {
-    timestamps: true, // Enables createdAt & updatedAt
+    timestamps: true,
   }
 );
+
+// Ensure TTL Index is created
+cookiePreferencesSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 730 });
 
 const CookiePreferences = mongoose.model("CookiePreferences", cookiePreferencesSchema);
 module.exports = CookiePreferences;

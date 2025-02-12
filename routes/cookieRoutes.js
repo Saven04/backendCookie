@@ -89,17 +89,9 @@ router.delete("/delete/:consentId", async (req, res) => {
     }
 });
 
-const express = require("express");
-const requestIp = require("request-ip");
-const LocationData = require("../models/locationData"); // Ensure this path is correct
 
-const router = express.Router();
 
-const express = require("express");
-const requestIp = require("request-ip");
-const LocationData = require("../models/locationData"); // Ensure this path is correct
 
-const router = express.Router();
 
 router.post("/location", async (req, res) => {
     try {
@@ -160,5 +152,6 @@ router.post("/location", async (req, res) => {
         });
     }
 });
+
 
 module.exports = router;

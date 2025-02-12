@@ -9,11 +9,10 @@ const locationSchema = new mongoose.Schema(
     country: { type: String, required: true },
     latitude: { type: Number },
     longitude: { type: Number },
-    createdAt: { type: Date, default: Date.now, expires: "30d" }, // ⏳ Auto-delete after 30 days
+    createdAt: { type: Date, default: Date.now, expires: "90d" }, // Auto-delete after 90 days
   },
   { timestamps: true }
 );
 
 const Location = mongoose.model("Location", locationSchema);
-
 module.exports = Location;

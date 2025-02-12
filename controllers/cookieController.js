@@ -1,14 +1,16 @@
-const Cookie = require("../models/cookiePreference");
-const crypto = require("crypto");
+const express = require('express');
+const router = express.Router();
+const Cookie = require('../models/cookiePreference'); // Ensure this path is correct
+const crypto = require("crypto"); // Ensure the crypto module is used
 
-// ✅ Function to generate a short, unique Consent ID
+// Function to generate a short, unique consent ID
 const generateShortId = () => {
     return crypto.randomBytes(6).toString("base64")
         .replace(/[+/=]/g, "")
         .slice(0, 8);
 };
 
-// ✅ Function to save or update user cookie preferences
+// Function to save or update user cookie preferences
 const saveCookiePreferences = async (consentId, preferences) => {
     try {
         if (!consentId || !preferences) {
@@ -17,15 +19,14 @@ const saveCookiePreferences = async (consentId, preferences) => {
 
         console.log(`🔹 Processing Consent ID: ${consentId}`);
 
-        const timestamp = new Date().toISOString(); // Store timestamp in UTC format
+        const timestamp = new Date().toISOString(); // Store in UTC format
 
-        // Check if preferences already exist for the given Consent ID
         let cookiePreferences = await Cookie.findOne({ consentId });
 
         if (cookiePreferences) {
             console.log("🔄 Updating existing cookie preferences...");
             cookiePreferences.preferences = preferences;
-            cookiePreferences.timestamp = timestamp;
+            cookiePreferences.timestamp = timestamp; // Update timestamp to UTC
             await cookiePreferences.save();
             return { message: "Preferences updated successfully", consentId };
         } else {
@@ -40,26 +41,30 @@ const saveCookiePreferences = async (consentId, preferences) => {
     }
 };
 
-// ✅ Function to delete cookie preferences by Consent ID
-const deleteCookiePreferences = async (consentId) => {
+// POST route to handle cookie preferences saving
+router.post('/save', async (req, res) => {
     try {
+        let { consentId, preferences } = req.body;
+
+        // Ensure `consentId` is not regenerated if already provided
         if (!consentId) {
-            throw new Error("Consent ID is required.");
+            consentId = generateShortId();
+            console.log(`🔹 Generated new Consent ID: ${consentId}`);
+        } else {
+            console.log(`✅ Received existing Consent ID: ${consentId}`);
         }
 
-        const result = await Cookie.deleteOne({ consentId });
-
-        if (result.deletedCount === 0) {
-            throw new Error("No data found for the given Consent ID.");
+        if (!preferences || typeof preferences !== 'object' || Object.keys(preferences).length === 0) {
+            return res.status(400).json({ error: "Preferences must be a non-empty object." });
         }
 
-        console.log(`🗑️ Deleted cookie preferences for Consent ID: ${consentId}`);
-        return { message: "Cookie preferences deleted successfully." };
+        const result = await saveCookiePreferences(consentId, preferences);
+
+        res.status(200).json(result);
     } catch (error) {
-        console.error("❌ Error deleting preferences:", error.message);
-        throw new Error("Failed to delete preferences: " + error.message);
+        console.error("❌ Error in /save route:", error.message);
+        res.status(500).json({ error: error.message });
     }
-};
+});
 
-// ✅ Export functions for use in cookieRoutes.js
-module.exports = { saveCookiePreferences, deleteCookiePreferences };
+module.exports = { saveCookiePreferences, router };

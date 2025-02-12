@@ -110,15 +110,27 @@ router.delete("/delete-my-data/:consentId", async (req, res) => {
     try {
         const { consentId } = req.params;
 
-        // Delete user's stored data
-        await deleteCookiePreferences(consentId);
-        await deleteLocationData(consentId);
+        if (!consentId) {
+            return res.status(400).json({ error: "Consent ID is required" });
+        }
 
-        res.status(200).json({ message: "Your data has been deleted successfully." });
+        // Delete user's stored data in parallel
+        const [cookieDeleteResult, locationDeleteResult] = await Promise.all([
+            deleteCookiePreferences(consentId),
+            deleteLocationData(consentId)
+        ]);
+
+        res.status(200).json({ 
+            message: "Your data has been deleted successfully.",
+            cookieDeleteResult,
+            locationDeleteResult
+        });
+
     } catch (error) {
-        console.error("Error deleting user data:", error);
+        console.error("❌ Error deleting user data:", error);
         res.status(500).json({ error: "Failed to delete user data." });
     }
 });
+
 
 module.exports = router;

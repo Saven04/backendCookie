@@ -23,7 +23,7 @@ const cookiePreferencesSchema = new mongoose.Schema(
     },
     createdAt: {
       type: Date,
-      default: () => moment().tz("Asia/Kolkata").toDate(), // Save in IST
+      default: () => moment().tz("Asia/Kolkata").toDate(), 
       expires: 365 * 24 * 60 * 60, // Auto-delete after 365 days
     },
   },

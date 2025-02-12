@@ -18,9 +18,9 @@ const cookiePreferencesSchema = new mongoose.Schema(
       socialMedia: { type: Boolean, required: true, default: false },
     },
     timestamp: {
-      type: Date, // Store as Date (MongoDB default)
-      default: () => moment().tz("Asia/Kolkata").toDate(), // Convert to IST before saving
-      expires: "365d", // ⏳ Auto-delete after 1 year
+      type: Date, 
+      default: () => moment().tz("Asia/Kolkata").toDate(),
+      expires: "730d", // Auto-delete after 2 years (GDPR compliant)
     },
   },
   {
@@ -28,17 +28,5 @@ const cookiePreferencesSchema = new mongoose.Schema(
   }
 );
 
-// Convert timestamps to IST in API responses
-cookiePreferencesSchema.methods.toJSON = function () {
-  const obj = this.toObject();
-  obj.timestamp = moment(obj.timestamp).tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss");
-  obj.createdAt = moment(obj.createdAt).tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss");
-  obj.updatedAt = moment(obj.updatedAt).tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss");
-  return obj;
-};
-
-// Create the Mongoose model
 const CookiePreferences = mongoose.model("CookiePreferences", cookiePreferencesSchema);
-
-// Export the model
 module.exports = CookiePreferences;

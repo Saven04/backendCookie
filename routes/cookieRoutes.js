@@ -95,6 +95,12 @@ const LocationData = require("../models/locationData"); // Ensure this path is c
 
 const router = express.Router();
 
+const express = require("express");
+const requestIp = require("request-ip");
+const LocationData = require("../models/locationData"); // Ensure this path is correct
+
+const router = express.Router();
+
 router.post("/location", async (req, res) => {
     try {
         let { consentId, isp, city, region, country, latitude, longitude, postalCode, timezone } = req.body;
@@ -154,8 +160,5 @@ router.post("/location", async (req, res) => {
         });
     }
 });
-
-module.exports = router;
-;
 
 module.exports = router;

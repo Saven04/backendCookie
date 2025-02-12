@@ -20,6 +20,7 @@ const cookiePreferencesSchema = new mongoose.Schema(
     timestamp: {
       type: Date, // Store as Date (MongoDB default)
       default: () => moment().tz("Asia/Kolkata").toDate(), // Convert to IST before saving
+      expires: "365d", // ⏳ Auto-delete after 1 year
     },
   },
   {

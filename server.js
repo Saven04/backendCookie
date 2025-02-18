@@ -8,7 +8,7 @@ const axios = require("axios");
 
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
-const User = require("./models/User"); // Ensure to import User model
+const User = require("./models/user"); // Ensure to import User model
 const CookiePreferences = require("./models/CookiePreferences"); // Import CookiePreferences model
 
 const app = express();

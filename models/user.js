@@ -6,11 +6,17 @@ function hashEmail(email) {
     return crypto.createHash("sha256").update(email).digest("hex");
 }
 
+// Function to generate a unique consentId (using UUID or random string)
+function generateConsentId() {
+    return crypto.randomBytes(16).toString("hex"); // Generate a unique consentId (16-byte hex string)
+}
+
 const UserSchema = new mongoose.Schema(
   {
     username: { type: String, required: true },
     email: { type: String, required: true, unique: true, set: hashEmail }, // Store hashed email
     password: { type: String, required: true }, // Use bcrypt hashing before storing
+    consentId: { type: String, required: true, unique: true, default: generateConsentId }, // Unique consentId
 
     lastActive: { type: Date, default: Date.now }, // Tracks last activity
     deletedAt: { type: Date, default: null }, // Marks account for deletion

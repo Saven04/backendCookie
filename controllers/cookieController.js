@@ -41,6 +41,29 @@ const saveCookiePreferences = async (consentId, preferences) => {
     }
 };
 
+// Function to delete user cookie preferences by consentId
+const deleteCookiePreferences = async (consentId) => {
+    try {
+        if (!consentId) {
+            throw new Error("Consent ID is required.");
+        }
+
+        console.log(`🔹 Deleting Cookie Preferences for Consent ID: ${consentId}`);
+
+        const result = await Cookie.deleteOne({ consentId });
+
+        if (result.deletedCount === 0) {
+            throw new Error(`No preferences found for Consent ID: ${consentId}`);
+        }
+
+        console.log("✅ Cookie preferences deleted successfully.");
+        return { message: "Cookie preferences deleted successfully", consentId };
+    } catch (error) {
+        console.error("❌ Error deleting cookie preferences:", error.message);
+        throw new Error("Failed to delete preferences: " + error.message);
+    }
+};
+
 // POST route to handle cookie preferences saving
 router.post('/save', async (req, res) => {
     try {
@@ -67,4 +90,4 @@ router.post('/save', async (req, res) => {
     }
 });
 
-module.exports = { saveCookiePreferences, router };
+module.exports = { saveCookiePreferences, deleteCookiePreferences };

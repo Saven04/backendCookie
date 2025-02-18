@@ -132,5 +132,4 @@ router.delete("/delete-my-data/:consentId", async (req, res) => {
     }
 });
 
-
 module.exports = router;

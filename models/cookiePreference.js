@@ -8,7 +8,6 @@ const cookiePreferencesSchema = new mongoose.Schema(
       required: [true, "Consent ID is required."],
       unique: true,
       trim: true,
-      ref: "User", // Reference to User model
     },
     preferences: {
       strictlyNecessary: { type: Boolean, required: true, default: true },
@@ -19,7 +18,7 @@ const cookiePreferencesSchema = new mongoose.Schema(
     },
     createdAt: {
       type: Date,
-      default: () => moment().tz("Asia/Kolkata").toDate(),
+      default: () => moment().tz("Asia/Kolkata").toDate(), 
       expires: 60 * 60 * 24 * 730, // Auto-delete after 2 years (730 days)
     },
   },
@@ -28,24 +27,8 @@ const cookiePreferencesSchema = new mongoose.Schema(
   }
 );
 
-// TTL Index to auto-delete preferences after 2 years (730 days)
+// Ensure TTL Index is created
 cookiePreferencesSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 730 });
 
-// Index for consentId to optimize queries
-cookiePreferencesSchema.index({ consentId: 1 });
-
-// Pre-save hook to ensure `consentId` exists in the User collection before saving preferences
-cookiePreferencesSchema.pre('save', async function(next) {
-  try {
-    const user = await mongoose.model("User").findOne({ consentId: this.consentId });
-    if (!user) {
-      throw new Error("Consent ID not found in User model.");
-    }
-    next();
-  } catch (error) {
-    next(error);
-  }
-});
-
-const CookiePreference = mongoose.model("CookiePreference", cookiePreferencesSchema);
-module.exports = CookiePreference;
+const CookiePreferences = mongoose.model("CookiePreferences", cookiePreferencesSchema);
+module.exports = CookiePreferences;

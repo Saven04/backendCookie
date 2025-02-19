@@ -9,8 +9,7 @@ const cookiePreferencesSchema = new mongoose.Schema(
       unique: true,
       trim: true,
       // Reference to User model to ensure this consent is linked to a specific user
-      // You can use this field to ensure integrity if you want to link it to a specific User document
-      ref: "User", 
+      ref: "User",
     },
     preferences: {
       strictlyNecessary: { type: Boolean, required: true, default: true },
@@ -30,19 +29,22 @@ const cookiePreferencesSchema = new mongoose.Schema(
   }
 );
 
-// **TTL Index to auto-delete preferences after 2 years (730 days)**
+// TTL Index to auto-delete preferences after 2 years (730 days)
 cookiePreferencesSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 730 });
 
-// Optional: Add pre-save hook to ensure `consentId` exists in the User collection before saving preferences
+// Pre-save hook to ensure `consentId` exists in the User collection before saving preferences
 cookiePreferencesSchema.pre('save', async function(next) {
-  const user = await mongoose.model("User").findOne({ consentId: this.consentId });
-  if (!user) {
-    const error = new Error("Consent ID not found in User model.");
-    next(error);  // Stop save if consentId does not exist in the User model
-  } else {
-    next(); // Proceed with save if consentId is valid
+  try {
+    const user = await mongoose.model("User").findOne({ consentId: this.consentId });
+    if (!user) {
+      throw new Error("Consent ID not found in User model.");
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
 });
 
-const CookiePreferences = mongoose.model("CookiePreferences", cookiePreferencesSchema);
-module.exports = CookiePreferences;
+// Change model name from 'CookiePreferences' to 'CookiePreference' for consistency with the file name
+const CookiePreference = mongoose.model("CookiePreference", cookiePreferencesSchema);
+module.exports = CookiePreference;

@@ -3,9 +3,9 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const bodyParser = require("body-parser");
-const requestIp = require("request-ip"); // ✅ Middleware to get real client IP
+const requestIp = require("request-ip"); // Middleware to get real client IP
 const axios = require("axios");
-const crypto = require("crypto"); 
+const crypto = require("crypto");
 
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
@@ -16,15 +16,21 @@ const app = express();
 
 // Middleware
 app.use(bodyParser.json());
-app.use(requestIp.mw()); // ✅ Middleware to capture client IP
+app.use(requestIp.mw()); // Middleware to capture client IP
 
-// CORS Configuration ✅ (Now handles preflight requests)
+// CORS Configuration (Now handles preflight requests)
 const allowedOrigins = ["https://t10hits.netlify.app"];
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
-    methods: ["GET", "POST", "DELETE", "PUT", "OPTIONS"], // ✅ Ensures CORS works correctly
+    methods: ["GET", "POST", "DELETE", "PUT", "OPTIONS"], // Ensures CORS works correctly
   })
 );
 
@@ -46,7 +52,7 @@ const connectDB = async () => {
 app.use("/api", cookieRoutes);
 app.use("/api/auth", authRoutes);
 
-// ✅ Fixed: Route now matches frontend request (/api/save)
+// Route now matches frontend request (/api/save)
 app.post("/api/save", async (req, res) => {
   try {
     let { consentId, preferences } = req.body;
@@ -56,13 +62,13 @@ app.post("/api/save", async (req, res) => {
       return res.status(400).json({ error: "Missing preferences" });
     }
 
-    // ✅ Generate a new consentId if not provided
+    // Generate a new consentId if not provided
     if (!consentId) {
       consentId = crypto.randomBytes(6).toString("hex"); // Generate unique ID
       console.log("🆕 Generated new consentId:", consentId);
     }
 
-    // ✅ Check if user exists, create if not
+    // Check if user exists, create if not
     let user = await User.findOne({ consentId });
 
     if (!user) {
@@ -71,7 +77,7 @@ app.post("/api/save", async (req, res) => {
       await user.save();
     }
 
-    // ✅ Check if preferences already exist for this consentId
+    // Check if preferences already exist for this consentId
     let existingPreferences = await CookiePreferences.findOne({ consentId });
 
     if (existingPreferences) {
@@ -80,7 +86,7 @@ app.post("/api/save", async (req, res) => {
       return res.status(200).json({ message: "✅ Cookie preferences updated successfully", consentId });
     }
 
-    // ✅ Create new cookie preferences
+    // Create new cookie preferences
     const newPreferences = new CookiePreferences({ consentId, preferences });
     await newPreferences.save();
 
@@ -91,7 +97,7 @@ app.post("/api/save", async (req, res) => {
   }
 });
 
-// ✅ Fixed: IP address handling improved
+// Improved IP address handling
 app.get("/api/get-ipinfo", async (req, res) => {
   try {
     let clientIp = requestIp.getClientIp(req) || "Unknown";
@@ -128,7 +134,7 @@ app.get("/", (req, res) => {
   res.status(200).json({ message: "✅ Server is running on Render and healthy." });
 });
 
-// Start the server after DB connection ✅
+// Start the server after DB connection
 const PORT = process.env.PORT || 3000;
 connectDB().then(() => {
   app.listen(PORT, () => {

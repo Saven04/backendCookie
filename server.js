@@ -3,13 +3,13 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const bodyParser = require("body-parser");
-const requestIp = require("request-ip"); // ✅ Correct way to get real client IP
+const requestIp = require("request-ip"); // ✅ Middleware to get real client IP
 const axios = require("axios");
 
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
-const User = require("./models/user"); // Ensure to import User model
-const CookiePreferences = require("./models/cookiePreference"); // Import CookiePreferences model
+const User = require("./models/user");
+const CookiePreferences = require("./models/cookiePreference");
 
 const app = express();
 
@@ -17,12 +17,13 @@ const app = express();
 app.use(bodyParser.json());
 app.use(requestIp.mw()); // ✅ Middleware to capture client IP
 
-// CORS Configuration
+// CORS Configuration ✅ (Now handles preflight requests)
 const allowedOrigins = ["https://t10hits.netlify.app"];
 app.use(
   cors({
     origin: allowedOrigins,
     credentials: true,
+    methods: ["GET", "POST", "DELETE", "PUT", "OPTIONS"], // ✅ Ensures CORS works correctly
   })
 );
 
@@ -39,38 +40,36 @@ const connectDB = async () => {
     process.exit(1);
   }
 };
-connectDB();
 
 // Routes
 app.use("/api", cookieRoutes);
 app.use("/api/auth", authRoutes);
 
-// Route to handle saving user's cookie preferences
-app.post("/api/save-cookie-preferences", async (req, res) => {
+// ✅ Fixed: Route now matches frontend request (/api/save)
+app.post("/api/save", async (req, res) => {
   try {
     const { consentId, preferences } = req.body;
+
+    if (!consentId || !preferences) {
+      return res.status(400).json({ error: "Missing consentId or preferences" });
+    }
 
     // Ensure the consentId is associated with a valid user
     const user = await User.findOne({ consentId });
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ error: "Consent ID not found in User model" });
     }
 
-    // Check if preferences already exist for this consentId
+    // Check if preferences already exist
     let existingPreferences = await CookiePreferences.findOne({ consentId });
     if (existingPreferences) {
-      // Update existing preferences
       existingPreferences.preferences = preferences;
       await existingPreferences.save();
       return res.status(200).json({ message: "Cookie preferences updated successfully" });
     }
 
-    // Create a new CookiePreferences entry
-    const newPreferences = new CookiePreferences({
-      consentId,
-      preferences,
-    });
-
+    // Create new cookie preferences
+    const newPreferences = new CookiePreferences({ consentId, preferences });
     await newPreferences.save();
 
     res.status(201).json({ message: "Cookie preferences saved successfully" });
@@ -80,7 +79,7 @@ app.post("/api/save-cookie-preferences", async (req, res) => {
   }
 });
 
-// Route to get the real client IP and fetch geolocation data from `ip-api.com`
+// ✅ Fixed: IP address handling improved
 app.get("/api/get-ipinfo", async (req, res) => {
   try {
     let clientIp = requestIp.getClientIp(req) || "Unknown";
@@ -90,14 +89,17 @@ app.get("/api/get-ipinfo", async (req, res) => {
       clientIp = clientIp.split("::ffff:")[1];
     }
 
+    // Handle localhost case
+    if (clientIp === "::1") {
+      clientIp = "127.0.0.1";
+    }
+
     console.log("📌 Detected Client IP:", clientIp);
 
-    // Fetch geolocation data from `ip-api.com`
+    // Fetch geolocation data
     const response = await axios.get(`http://ip-api.com/json/${clientIp}`);
-
-    // Send response with IP and location
     res.json({
-      ip: clientIp, // ✅ Ensures correct IPv4 address is sent
+      ip: clientIp,
       city: response.data.city || "Unknown",
       region: response.data.regionName || "Unknown",
       country: response.data.country || "Unknown",
@@ -114,8 +116,10 @@ app.get("/", (req, res) => {
   res.status(200).json({ message: "✅ Server is running on Render and healthy." });
 });
 
-// Start the server
+// Start the server after DB connection ✅
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+connectDB().then(() => {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+  });
 });

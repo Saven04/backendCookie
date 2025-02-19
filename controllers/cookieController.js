@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const Cookie = require('../models/cookiePreference'); // Ensure this path is correct
+const Cookie = require('../models/CookiePreference'); // Ensure this path is correct
+const User = require('../models/User');
 const crypto = require("crypto");
 
-// Function to generate a short, unique consent ID
+// Function to generate a short, unique consent ID (for fallback only)
 const generateShortId = () => {
     return crypto.randomBytes(6).toString("base64")
         .replace(/[+/=]/g, "")
@@ -18,6 +19,12 @@ const saveCookiePreferences = async (consentId, preferences) => {
         }
 
         console.log(`🔹 Processing Consent ID: ${consentId}`);
+
+        // Check if user exists with this consentId
+        const user = await User.findOne({ consentId });
+        if (!user) {
+            throw new Error("No user found with this Consent ID.");
+        }
 
         const timestamp = new Date().toISOString(); // Store in UTC format
 
@@ -50,6 +57,12 @@ const deleteCookiePreferences = async (consentId) => {
 
         console.log(`🔹 Deleting Cookie Preferences for Consent ID: ${consentId}`);
 
+        // Check if user exists with this consentId
+        const user = await User.findOne({ consentId });
+        if (!user) {
+            throw new Error("No user found with this Consent ID.");
+        }
+
         const result = await Cookie.deleteOne({ consentId });
 
         if (result.deletedCount === 0) {
@@ -71,10 +84,8 @@ router.post('/save', async (req, res) => {
 
         // Ensure `consentId` is not regenerated if already provided
         if (!consentId) {
-            consentId = generateShortId();
-            console.log(`🔹 Generated new Consent ID: ${consentId}`);
-        } else {
-            console.log(`✅ Received existing Consent ID: ${consentId}`);
+            console.warn("No Consent ID provided, this should not happen if handled correctly on the frontend.");
+            return res.status(400).json({ error: "Consent ID is required." });
         }
 
         if (!preferences || typeof preferences !== 'object' || Object.keys(preferences).length === 0) {

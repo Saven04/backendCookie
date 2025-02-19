@@ -81,5 +81,8 @@ function updateLastActive(next) {
     next();
 }
 
+// Ensure index on consentId for performance in queries
+UserSchema.index({ consentId: 1 });
+
 const User = mongoose.model("User", UserSchema);
 module.exports = User;

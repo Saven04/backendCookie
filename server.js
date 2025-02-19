@@ -5,15 +5,11 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 const requestIp = require("request-ip"); // ✅ Capture real client IP
 const axios = require("axios");
-const helmet = require("helmet"); // ✅ Security middleware
 
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
 
 const app = express();
-
-// ✅ Security Middleware
-app.use(helmet()); // Adds HTTP security headers
 
 // ✅ Middleware
 app.use(bodyParser.json());

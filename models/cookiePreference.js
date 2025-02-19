@@ -8,6 +8,7 @@ const cookiePreferencesSchema = new mongoose.Schema(
       required: [true, "Consent ID is required."],
       unique: true,
       trim: true,
+      ref: "User", // Linking to User model
     },
     preferences: {
       strictlyNecessary: { type: Boolean, required: true, default: true },
@@ -18,7 +19,7 @@ const cookiePreferencesSchema = new mongoose.Schema(
     },
     createdAt: {
       type: Date,
-      default: () => moment().tz("Asia/Kolkata").toDate(), 
+      default: () => moment().tz("Asia/Kolkata").toDate(),
       expires: 60 * 60 * 24 * 730, // Auto-delete after 2 years (730 days)
     },
   },

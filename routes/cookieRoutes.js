@@ -1,18 +1,25 @@
 const express = require("express");
+const crypto = require("crypto");
 const { saveCookiePreferences } = require("../controllers/cookieController");
 const { saveLocationData } = require("../controllers/locationController");
-const crypto = require("crypto");
-
+const User = require("../models/user"); // User model
 const router = express.Router();
+
 router.use(express.json()); // Middleware to parse JSON
 
-// Generate a short consent ID (only if necessary)
+// Generate a short consent ID for guest users
 const generateShortId = () => {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    const bytes = crypto.randomBytes(6);
-    return bytes.toString("base64")
-                .replace(/[+/=]/g, "") 
-                .slice(0, 8);
+    return crypto.randomBytes(6).toString("hex").slice(0, 12);
+};
+
+// Middleware to fetch consentId for logged-in users
+const getUserConsentId = async (req) => {
+    if (req.user) {
+        // Fetch consentId from logged-in user's data
+        const user = await User.findOne({ email: req.user.email });
+        return user ? user.consentId : null;
+    }
+    return null;
 };
 
 // 👉 **Updated POST Route to Save Cookie Preferences**
@@ -22,10 +29,11 @@ router.post("/save", async (req, res) => {
 
         let { consentId, preferences } = req.body;
 
-        // If consentId is not provided, generate a new one
-        if (!consentId) {
-            consentId = generateShortId();
-        }
+        // If user is logged in, fetch their consentId
+        const userConsentId = await getUserConsentId(req);
+
+        // Use user's consentId if available; otherwise, generate a new one
+        consentId = userConsentId || consentId || generateShortId();
 
         // Validate preferences
         if (!preferences || typeof preferences !== "object" || Array.isArray(preferences)) {
@@ -43,7 +51,6 @@ router.post("/save", async (req, res) => {
         // Save to database
         await saveCookiePreferences(consentId, preferences);
 
-        // ✅ **Return the same `consentId` to be used for location data**
         res.status(200).json({ 
             message: "Cookie preferences saved successfully.",
             consentId
@@ -63,8 +70,13 @@ router.post("/location", async (req, res) => {
     try {
         let { consentId, ipAddress, isp, city, country, latitude, longitude } = req.body;
 
+        // If user is logged in, fetch their consentId
+        const userConsentId = await getUserConsentId(req);
+
+        // Use user's consentId if available; otherwise, reject missing ID
+        consentId = userConsentId || consentId;
         if (!consentId) {
-            return res.status(400).json({ message: "Missing consent ID." });
+            return res.status(400).json({ message: "Missing consent ID. Please log in or register." });
         }
 
         // Validate required fields

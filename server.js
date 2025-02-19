@@ -3,7 +3,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const bodyParser = require("body-parser");
-const requestIp = require("request-ip"); // ✅ Correct way to get real client IP
+const requestIp = require("request-ip"); // Middleware to get real client IP
 const axios = require("axios");
 
 const cookieRoutes = require("./routes/cookieRoutes");
@@ -13,14 +13,21 @@ const app = express();
 
 // Middleware
 app.use(bodyParser.json());
-app.use(requestIp.mw()); // ✅ Middleware to capture client IP
+app.use(requestIp.mw()); // Middleware to capture client IP
 
 // CORS Configuration
 const allowedOrigins = ["https://t10hits.netlify.app"];
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
+    methods: ["GET", "POST", "DELETE", "PUT", "OPTIONS"], // Ensuring CORS works correctly for all methods
   })
 );
 
@@ -37,13 +44,12 @@ const connectDB = async () => {
     process.exit(1);
   }
 };
-connectDB();
 
 // Routes
 app.use("/api", cookieRoutes);
 app.use("/api/auth", authRoutes);
 
-// ✅ Route to get the real client IP and fetch geolocation data from `ip-api.com`
+// Route to get the real client IP and fetch geolocation data from `ip-api.com`
 app.get("/api/get-ipinfo", async (req, res) => {
     try {
         let clientIp = requestIp.getClientIp(req) || "Unknown";
@@ -53,14 +59,18 @@ app.get("/api/get-ipinfo", async (req, res) => {
             clientIp = clientIp.split("::ffff:")[1];
         }
 
+        // Handle localhost case
+        if (clientIp === "::1") {
+            clientIp = "127.0.0.1";
+        }
+
         console.log("📌 Detected Client IP:", clientIp);
 
         // Fetch geolocation data from `ip-api.com`
         const response = await axios.get(`http://ip-api.com/json/${clientIp}`);
 
-        // Send response with IP and location
         res.json({
-            ip: clientIp, // ✅ Ensures correct IPv4 address is sent
+            ip: clientIp,
             city: response.data.city || "Unknown",
             region: response.data.regionName || "Unknown",
             country: response.data.country || "Unknown",
@@ -78,8 +88,10 @@ app.get("/", (req, res) => {
   res.status(200).json({ message: "✅ Server is running on Render and healthy." });
 });
 
-// Start the server
+// Start the server after DB connection
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+connectDB().then(() => {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+  });
 });

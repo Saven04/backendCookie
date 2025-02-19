@@ -1,63 +1,56 @@
 const express = require("express");
 const { saveCookiePreferences, deleteCookiePreferences } = require("../controllers/cookieController");
 const { saveLocationData, deleteLocationData } = require("../controllers/locationController");
-const User = require("../models/user");
 const crypto = require("crypto");
 
 const router = express.Router();
 router.use(express.json()); // Middleware to parse JSON
 
-// Function to generate a short consent ID
+// Generate a short consent ID (only if necessary)
 const generateShortId = () => {
-    return crypto.randomBytes(6).toString("base64")
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    const bytes = crypto.randomBytes(6);
+    return bytes.toString("base64")
                 .replace(/[+/=]/g, "") 
                 .slice(0, 8);
 };
 
-// POST Route to Save Cookie Preferences
+// 👉 **Updated POST Route to Save Cookie Preferences**
 router.post("/save", async (req, res) => {
     try {
-        console.log("📩 Received request body:", req.body);
+        console.log("Received request body:", req.body);
 
         let { consentId, preferences } = req.body;
+
+        // If consentId is not provided, generate a new one
+        if (!consentId) {
+            consentId = generateShortId();
+        }
 
         // Validate preferences
         if (!preferences || typeof preferences !== "object" || Array.isArray(preferences)) {
             return res.status(400).json({ message: "Invalid or missing preferences object." });
         }
 
-        // If `consentId` is missing, generate a new one and create a new user
-        if (!consentId) {
-            consentId = generateShortId();
-            console.log("⚠️ No consentId provided. Generated new one:", consentId);
-
-            // Create a new User record in MongoDB
-            const newUser = new User({ consentId });
-            await newUser.save();
-            console.log("✅ New User created with consentId:", consentId);
-        } else {
-            // Check if `consentId` exists in MongoDB
-            const existingUser = await User.findOne({ consentId });
-
-            if (!existingUser) {
-                console.error("❌ Consent ID not found in database:", consentId);
-                return res.status(404).json({ message: "Consent ID not found. A new User needs to be created first." });
+        // Ensure required keys are present
+        const requiredKeys = ["strictlyNecessary", "performance", "functional", "advertising", "socialMedia"];
+        for (const key of requiredKeys) {
+            if (!(key in preferences)) {
+                return res.status(400).json({ message: `Missing required key: ${key}` });
             }
         }
 
-        // Save cookie preferences
-        const result = await saveCookiePreferences(consentId, preferences);
+        // Save to database
+        await saveCookiePreferences(consentId, preferences);
 
-        console.log("✅ Cookie preferences saved successfully for consentId:", consentId);
-
+        // ✅ **Return the same `consentId` to be used for location data**
         res.status(200).json({ 
             message: "Cookie preferences saved successfully.",
-            consentId,
-            ...result
+            consentId
         });
 
     } catch (error) {
-        console.error("❌ Error saving cookie preferences:", error);
+        console.error("Error saving cookie preferences:", error);
         res.status(500).json({
             message: "Failed to save cookie preferences.",
             error: error.message || "Unknown error",
@@ -65,7 +58,7 @@ router.post("/save", async (req, res) => {
     }
 });
 
-// POST Route to Save Location Data
+// 👉 **Updated POST Route to Save Location Data**
 router.post("/location", async (req, res) => {
     try {
         let { consentId, ipAddress, isp, city, country, latitude, longitude } = req.body;
@@ -94,15 +87,15 @@ router.post("/location", async (req, res) => {
         }
 
         // Validate IP address format
-        const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+        const ipRegex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
         if (!ipRegex.test(ipAddress)) {
             return res.status(400).json({ message: "Invalid IP address format." });
         }
 
         // Save location data
-        const result = await saveLocationData({ consentId, ipAddress, isp, city, country, latitude, longitude });
+        await saveLocationData({ consentId, ipAddress, isp, city, country, latitude, longitude });
 
-        res.status(200).json({ message: "Location data saved successfully.", ...result });
+        res.status(200).json({ message: "Location data saved successfully." });
     } catch (error) {
         console.error("Error saving location data:", error);
         res.status(500).json({
@@ -112,19 +105,13 @@ router.post("/location", async (req, res) => {
     }
 });
 
-// Route to Delete User Data (Auto & Manual Deletion)
+// 👉 **NEW: Route to Delete User Data (Auto & Manual Deletion)**
 router.delete("/delete-my-data/:consentId", async (req, res) => {
     try {
         const { consentId } = req.params;
 
         if (!consentId) {
             return res.status(400).json({ error: "Consent ID is required" });
-        }
-
-        // Check if user exists with this consentId
-        const user = await User.findOne({ consentId });
-        if (!user) {
-            return res.status(404).json({ error: "User not found with this Consent ID." });
         }
 
         // Delete user's stored data in parallel

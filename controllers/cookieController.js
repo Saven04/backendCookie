@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const CookiePreference = require('../models/CookiePreference'); // Ensure this path is correct
+const CookiePreference = require('../models/cookiePreference'); // Ensure this path is correct
 const crypto = require("crypto");
 
 // Function to generate a short, unique consent ID

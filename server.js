@@ -5,6 +5,7 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 const requestIp = require("request-ip"); // ✅ Middleware to get real client IP
 const axios = require("axios");
+const crypto = require("crypto"); 
 
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
@@ -48,33 +49,44 @@ app.use("/api/auth", authRoutes);
 // ✅ Fixed: Route now matches frontend request (/api/save)
 app.post("/api/save", async (req, res) => {
   try {
-    const { consentId, preferences } = req.body;
+    let { consentId, preferences } = req.body;
 
-    if (!consentId || !preferences) {
-      return res.status(400).json({ error: "Missing consentId or preferences" });
+    // Validate request body
+    if (!preferences) {
+      return res.status(400).json({ error: "Missing preferences" });
     }
 
-    // Ensure the consentId is associated with a valid user
-    const user = await User.findOne({ consentId });
+    // ✅ Generate a new consentId if not provided
+    if (!consentId) {
+      consentId = crypto.randomBytes(6).toString("hex"); // Generate unique ID
+      console.log("🆕 Generated new consentId:", consentId);
+    }
+
+    // ✅ Check if user exists, create if not
+    let user = await User.findOne({ consentId });
+
     if (!user) {
-      return res.status(404).json({ error: "Consent ID not found in User model" });
+      console.warn("⚠️ Consent ID not found, creating new user:", consentId);
+      user = new User({ consentId });
+      await user.save();
     }
 
-    // Check if preferences already exist
+    // ✅ Check if preferences already exist for this consentId
     let existingPreferences = await CookiePreferences.findOne({ consentId });
+
     if (existingPreferences) {
       existingPreferences.preferences = preferences;
       await existingPreferences.save();
-      return res.status(200).json({ message: "Cookie preferences updated successfully" });
+      return res.status(200).json({ message: "✅ Cookie preferences updated successfully", consentId });
     }
 
-    // Create new cookie preferences
+    // ✅ Create new cookie preferences
     const newPreferences = new CookiePreferences({ consentId, preferences });
     await newPreferences.save();
 
-    res.status(201).json({ message: "Cookie preferences saved successfully" });
+    res.status(201).json({ message: "✅ Cookie preferences saved successfully", consentId });
   } catch (error) {
-    console.error("❌ Error saving cookie preferences:", error.message);
+    console.error("❌ Error saving cookie preferences:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });

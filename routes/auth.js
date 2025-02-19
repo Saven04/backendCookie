@@ -1,6 +1,6 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
-const User = require("../models/User"); // MongoDB User model
+const User = require("../models/user"); // MongoDB User model
 const router = express.Router();
 
 router.post("/register", async (req, res) => {

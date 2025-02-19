@@ -1,4 +1,5 @@
-const Location = require("../models/locationData");
+const Location = require("../models/Location");
+const User = require("../models/User");
 
 // Function to save or update location data
 const saveLocationData = async ({ consentId, ipAddress, isp, city, country, latitude, longitude }) => {
@@ -9,6 +10,12 @@ const saveLocationData = async ({ consentId, ipAddress, isp, city, country, lati
 
         console.log(`🔹 Processing Location Data for Consent ID: ${consentId}`);
 
+        // Check if user exists with this consentId
+        const user = await User.findOne({ consentId });
+        if (!user) {
+            throw new Error("No user found with this Consent ID.");
+        }
+
         // Check if location data for the same consentId already exists
         let locationData = await Location.findOne({ consentId });
 
@@ -18,8 +25,8 @@ const saveLocationData = async ({ consentId, ipAddress, isp, city, country, lati
             locationData.isp = isp;
             locationData.city = city;
             locationData.country = country;
-            locationData.latitude = latitude;
-            locationData.longitude = longitude;
+            locationData.latitude = latitude || locationData.latitude; // Keep existing value if not provided
+            locationData.longitude = longitude || locationData.longitude;
             await locationData.save();
             return { message: "Location data updated successfully.", consentId };
         } else {
@@ -51,6 +58,12 @@ const deleteLocationData = async (consentId) => {
         }
 
         console.log(`🔹 Deleting Location Data for Consent ID: ${consentId}`);
+
+        // Check if user exists with this consentId
+        const user = await User.findOne({ consentId });
+        if (!user) {
+            throw new Error("No user found with this Consent ID.");
+        }
 
         const result = await Location.deleteOne({ consentId });
 

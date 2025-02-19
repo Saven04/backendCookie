@@ -17,19 +17,11 @@ router.post("/register", async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Create new user with a generated consentId
-        const newUser = new User({ 
-            username, 
-            email, 
-            password: hashedPassword 
-        });
+        // Create new user
+        const newUser = new User({ username, email, password: hashedPassword });
         await newUser.save();
 
-        // Send response with consentId for reference or further use
-        res.status(201).json({ 
-            message: "User registered successfully!", 
-            consentId: newUser.consentId 
-        });
+        res.status(201).json({ message: "User registered successfully!" });
     } catch (error) {
         console.error("Error:", error);
         res.status(500).json({ message: "Server error. Please try again later." });

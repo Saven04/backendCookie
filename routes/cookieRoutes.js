@@ -1,5 +1,6 @@
 const express = require("express");
 const { saveCookiePreferences, deleteCookiePreferences } = require("../controllers/cookieController");
+const User = require("../models/user"); 
 const { saveLocationData, deleteLocationData } = require("../controllers/locationController");
 const crypto = require("crypto");
 

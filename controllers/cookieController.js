@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Cookie = require('../models/cookiePreference'); // Ensure this path is correct
-const crypto = require("crypto"); // Ensure the crypto module is used
+const crypto = require("crypto");
 
 // Function to generate a short, unique consent ID
 const generateShortId = () => {
@@ -90,4 +90,16 @@ router.post('/save', async (req, res) => {
     }
 });
 
-module.exports = { saveCookiePreferences, deleteCookiePreferences };
+// DELETE route to handle cookie preferences deletion
+router.delete('/delete/:consentId', async (req, res) => {
+    try {
+        const { consentId } = req.params;
+        const result = await deleteCookiePreferences(consentId);
+        res.status(200).json(result);
+    } catch (error) {
+        console.error("❌ Error in /delete route:", error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+module.exports = router; // Exporting the router directly

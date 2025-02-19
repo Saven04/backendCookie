@@ -8,10 +8,14 @@ const {
     saveLocationData, 
     deleteLocationData 
 } = require("../controllers/locationController");
-const db = require("../config/db"); // ✅ Ensure correct database import
+const connectDB = require("../db"); // ✅ Ensure MongoDB connection
+const User = require("../models/User"); // ✅ Import Mongoose User model
 
 const router = express.Router();
 router.use(express.json()); // Middleware to parse JSON
+
+// ✅ Connect to MongoDB when the server starts
+connectDB();
 
 // ✅ Generate a short consent ID (only if necessary)
 const generateShortId = () => {
@@ -45,16 +49,16 @@ router.post("/save", async (req, res) => {
             consentId = generateShortId();
             console.log("⚠️ No consentId provided. Generated new one:", consentId);
         } else {
-            // ✅ Check if consentId exists in the database
-            const existingUser = await db.collection("users").findOne({ consentId });
+            // ✅ Check if consentId exists in MongoDB (Mongoose)
+            const existingUser = await User.findOne({ consentId });
 
             if (!existingUser) {
-                console.error("❌ Consent ID not found in User model:", consentId);
-                return res.status(404).json({ message: "Consent ID not found in User model." });
+                console.error("❌ Consent ID not found in database:", consentId);
+                return res.status(404).json({ message: "Consent ID not found in database." });
             }
         }
 
-        // ✅ Save preferences
+        // ✅ Save preferences using Mongoose model
         await saveCookiePreferences(consentId, preferences);
 
         console.log("✅ Cookie preferences saved successfully for consentId:", consentId);

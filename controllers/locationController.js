@@ -1,5 +1,5 @@
-const Location = require("../models/Location");
-const User = require("../models/User");
+const Location = require("../models/locationData");
+const User = require("../models/user");
 
 // Function to save or update location data
 const saveLocationData = async ({ consentId, ipAddress, isp, city, country, latitude, longitude }) => {

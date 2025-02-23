@@ -1,10 +1,25 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const crypto = require("crypto"); // For generating UUIDs
+const crypto = require("crypto");
 const User = require("../models/user"); // MongoDB User model
 
 const router = express.Router();
+
+// Middleware to verify JWT
+const authenticateToken = (req, res, next) => {
+    const authHeader = req.headers["authorization"];
+    const token = authHeader && authHeader.split(" ")[1]; // Extract token
+
+    if (!token) return res.status(401).json({ message: "Access denied. No token provided." });
+
+    jwt.verify(token, process.env.JWT_SECRET || "default_secret_key", async (err, decoded) => {
+        if (err) return res.status(403).json({ message: "Invalid token." });
+
+        req.user = decoded; // Attach user data from token
+        next();
+    });
+};
 
 // Register Route
 router.post("/register", async (req, res) => {
@@ -55,11 +70,10 @@ router.post("/login", async (req, res) => {
         // Generate JWT token
         const token = jwt.sign(
             { userId: user._id, email: user.email },
-            process.env.JWT_SECRET || "default_secret_key", // Fallback for dev environments
-            { expiresIn: "1h" } // Token expires in 1 hour
+            process.env.JWT_SECRET || "default_secret_key",
+            { expiresIn: "1h" }
         );
 
-        // Send response with limited user data
         res.json({
             message: "Login successful",
             token,
@@ -67,11 +81,24 @@ router.post("/login", async (req, res) => {
                 id: user._id,
                 username: user.username,
                 email: user.email,
-                consentId: user.consentId, // Include consent ID
+                consentId: user.consentId,
             },
         });
     } catch (error) {
         console.error("Error during login:", error);
+        res.status(500).json({ message: "Server error. Please try again later." });
+    }
+});
+
+// Get User Details Route
+router.get("/user", authenticateToken, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.userId).select("-password"); // Exclude password
+        if (!user) return res.status(404).json({ message: "User not found." });
+
+        res.json(user);
+    } catch (error) {
+        console.error("Error fetching user data:", error);
         res.status(500).json({ message: "Server error. Please try again later." });
     }
 });

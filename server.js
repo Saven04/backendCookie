@@ -8,7 +8,7 @@ const axios = require("axios");
 const session = require("express-session"); // Add session support
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
-
+app.use(express.json());
 const app = express();
 
 // CORS Configuration
@@ -58,7 +58,7 @@ connectDB();
 
 // Routes
 app.use("/api", cookieRoutes); // Cookie-related routes
-app.use("/api/auth", authRoutes); 
+app.use("/api", authRoutes); 
 
 // ✅ Route to get the real client IP and fetch geolocation data from `ip-api.com`
 app.get("/api/get-ipinfo", async (req, res) => {
@@ -84,6 +84,34 @@ app.get("/api/get-ipinfo", async (req, res) => {
   } catch (error) {
     console.error("❌ Error fetching IP info:", error.message);
     res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+
+app.post("/api/login", async (req, res) => {
+  try {
+      console.log("Received login request:", req.body); // Debug log
+
+      const { email, password } = req.body;
+      if (!email || !password) {
+          return res.status(400).json({ message: "Email and password are required" });
+      }
+
+      const user = await User.findOne({ email });
+      if (!user) {
+          return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+          return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      const token = jwt.sign({ id: user._id }, "secret_key", { expiresIn: "1h" });
+      return res.json({ token, user });
+  } catch (error) {
+      console.error("Login error:", error);
+      return res.status(500).json({ message: "Internal server error" });
   }
 });
 

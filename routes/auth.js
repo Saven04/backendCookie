@@ -5,7 +5,6 @@ const crypto = require("crypto"); // For generating UUIDs
 const User = require("../models/user"); // MongoDB User model
 
 const router = express.Router();
-const SECRET_KEY = "32b3d47ef5ed82cb2e8202b0b29e37a18037a228133507f973a8fec946e03b8d"; // Replace with a secure secret key
 
 // Register Route
 router.post("/register", async (req, res) => {
@@ -31,7 +30,7 @@ router.post("/register", async (req, res) => {
 
         res.status(201).json({ message: "User registered successfully!", consentId: finalConsentId });
     } catch (error) {
-        console.error("Error:", error);
+        console.error("Error during registration:", error);
         res.status(500).json({ message: "Server error. Please try again later." });
     }
 });
@@ -56,13 +55,23 @@ router.post("/login", async (req, res) => {
         // Generate JWT token
         const token = jwt.sign(
             { userId: user._id, email: user.email },
-            process.env.JWT_SECRET,
+            process.env.JWT_SECRET || "default_secret_key", // Fallback for dev environments
             { expiresIn: "1h" } // Token expires in 1 hour
         );
 
-        res.json({ message: "Login successful", token, user });
+        // Send response with limited user data
+        res.json({
+            message: "Login successful",
+            token,
+            user: {
+                id: user._id,
+                username: user.username,
+                email: user.email,
+                consentId: user.consentId, // Include consent ID
+            },
+        });
     } catch (error) {
-        console.error("Error:", error);
+        console.error("Error during login:", error);
         res.status(500).json({ message: "Server error. Please try again later." });
     }
 });

@@ -3,7 +3,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const bodyParser = require("body-parser");
-const requestIp = require("request-ip"); // ✅ Correct way to get real client IP
+const requestIp = require("request-ip"); // ✅ Get real client IP
 const axios = require("axios");
 const session = require("express-session"); // Add session support
 const cookieRoutes = require("./routes/cookieRoutes");
@@ -16,7 +16,9 @@ const allowedOrigins = ["https://t10hits.netlify.app"];
 app.use(
   cors({
     origin: allowedOrigins,
-    credentials: true, // Allow cookies and sessions
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"], // Allow credentials headers
+    methods: ["GET", "POST", "PUT", "DELETE"],
   })
 );
 
@@ -27,13 +29,13 @@ app.use(requestIp.mw()); // ✅ Middleware to capture client IP
 // Session Configuration
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || "your-secret-key", // Use a strong secret key
+    secret: process.env.SESSION_SECRET, // Use a strong secret key
     resave: false,
     saveUninitialized: true,
     cookie: {
       secure: process.env.NODE_ENV === "production", // Use `secure` cookies in production (HTTPS)
-      httpOnly: true, // Prevent client-side JavaScript access to cookies
-      sameSite: "strict", // Prevent CSRF attacks
+      httpOnly: true,
+      sameSite: "strict",
     },
   })
 );
@@ -44,10 +46,11 @@ const connectDB = async () => {
     await mongoose.connect(process.env.MONGO_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
+      dbName: "yourDatabaseName",
     });
     console.log("✅ Connected to MongoDB successfully");
   } catch (err) {
-    console.error("❌ Error connecting to MongoDB:", err);
+    console.error("❌ MongoDB connection error:", err);
     process.exit(1);
   }
 };
@@ -55,14 +58,13 @@ connectDB();
 
 // Routes
 app.use("/api", cookieRoutes); // Cookie-related routes
-app.use("/api/auth", authRoutes); // Authentication routes
+app.use("/api", authRoutes); // ✅ Changed to "/api" to match frontend requests
 
 // ✅ Route to get the real client IP and fetch geolocation data from `ip-api.com`
 app.get("/api/get-ipinfo", async (req, res) => {
   try {
     let clientIp = requestIp.getClientIp(req) || "Unknown";
 
-    // Convert IPv6-mapped IPv4 addresses (e.g., "::ffff:192.168.1.1") to IPv4
     if (clientIp.includes("::ffff:")) {
       clientIp = clientIp.split("::ffff:")[1];
     }
@@ -72,9 +74,8 @@ app.get("/api/get-ipinfo", async (req, res) => {
     // Fetch geolocation data from `ip-api.com`
     const response = await axios.get(`http://ip-api.com/json/${clientIp}`);
 
-    // Send response with IP and location
     res.json({
-      ip: clientIp, // ✅ Ensures correct IPv4 address is sent
+      ip: clientIp,
       city: response.data.city || "Unknown",
       region: response.data.regionName || "Unknown",
       country: response.data.country || "Unknown",
@@ -89,6 +90,11 @@ app.get("/api/get-ipinfo", async (req, res) => {
 // Health check route
 app.get("/", (req, res) => {
   res.status(200).json({ message: "✅ Server is running on Render and healthy." });
+});
+
+// 404 Handler
+app.use((req, res, next) => {
+  res.status(404).json({ message: "❌ Route not found." });
 });
 
 // Start the server

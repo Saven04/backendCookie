@@ -11,10 +11,6 @@ const authRoutes = require("./routes/auth");
 
 const app = express();
 
-// Middleware
-app.use(bodyParser.json());
-app.use(requestIp.mw()); // ✅ Middleware to capture client IP
-
 // CORS Configuration
 const allowedOrigins = ["https://t10hits.netlify.app"];
 app.use(
@@ -23,6 +19,10 @@ app.use(
     credentials: true, // Allow cookies and sessions
   })
 );
+
+// Middleware
+app.use(bodyParser.json());
+app.use(requestIp.mw()); // ✅ Middleware to capture client IP
 
 // Session Configuration
 app.use(
@@ -61,14 +61,17 @@ app.use("/api/auth", authRoutes); // Authentication routes
 app.get("/api/get-ipinfo", async (req, res) => {
   try {
     let clientIp = requestIp.getClientIp(req) || "Unknown";
+
     // Convert IPv6-mapped IPv4 addresses (e.g., "::ffff:192.168.1.1") to IPv4
     if (clientIp.includes("::ffff:")) {
       clientIp = clientIp.split("::ffff:")[1];
     }
+
     console.log("📌 Detected Client IP:", clientIp);
 
     // Fetch geolocation data from `ip-api.com`
     const response = await axios.get(`http://ip-api.com/json/${clientIp}`);
+
     // Send response with IP and location
     res.json({
       ip: clientIp, // ✅ Ensures correct IPv4 address is sent

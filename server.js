@@ -8,9 +8,11 @@ const axios = require("axios");
 const session = require("express-session"); // Add session support
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
-app.use(express.json());
 const app = express();
 
+
+
+app.use(express.json());
 // CORS Configuration
 const allowedOrigins = ["https://t10hits.netlify.app"];
 app.use(

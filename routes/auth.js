@@ -60,14 +60,22 @@ router.post("/login", async (req, res) => {
 });
 
 // GET /check-auth - Check if the user is authenticated
+
+// Middleware to check authentication status
 router.get("/check-auth", (req, res) => {
-    if (req.session && req.session.userId) {
-        // User is authenticated
-        res.status(200).json({ authenticated: true });
-    } else {
-        // User is not authenticated
-        res.status(200).json({ authenticated: false });
+    try {
+        // Check if the session contains a userId
+        if (req.session && req.session.userId) {
+            return res.status(200).json({ authenticated: true });
+        } else {
+            return res.status(200).json({ authenticated: false });
+        }
+    } catch (error) {
+        console.error("❌ Error in /check-auth:", error);
+        return res.status(500).json({ error: "Internal Server Error" });
     }
 });
+
+module.exports = router;
 
 module.exports = router;

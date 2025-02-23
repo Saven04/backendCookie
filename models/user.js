@@ -8,14 +8,36 @@ function hashEmail(email) {
 
 const UserSchema = new mongoose.Schema(
   {
-    username: { type: String, required: true },
-    email: { type: String, required: true, unique: true, set: hashEmail }, // Store hashed email
-    password: { type: String, required: true }, // Use bcrypt hashing before storing
-    
-    consentId: { type: String, unique: true, required: true }, // Link user with cookie consent data
-    
-    lastActive: { type: Date, default: Date.now }, // Tracks last activity
-    deletedAt: { type: Date, default: null }, // Marks account for deletion
+    username: { 
+        type: String, 
+        required: true 
+    },
+    email: { 
+        type: String, 
+        required: true, 
+        unique: true, 
+        set: hashEmail // Store hashed email for privacy
+    },
+    password: { 
+        type: String, 
+        required: true 
+    }, // Use bcrypt hashing before storing
+
+    consentId: { 
+        type: String, 
+        unique: true, 
+        required: true, 
+        default: () => crypto.randomUUID() // Generate a unique consentId by default
+    }, // Link user with cookie consent data
+
+    lastActive: { 
+        type: Date, 
+        default: Date.now 
+    }, // Tracks last activity
+    deletedAt: { 
+        type: Date, 
+        default: null 
+    }, // Marks account for deletion
   },
   { timestamps: true }
 );
@@ -31,6 +53,7 @@ UserSchema.methods.toJSON = function () {
     const obj = this.toObject();
     delete obj.password; // Remove password from API response
     obj.email = obj.email ? "**********" : null; // Mask email
+    obj.consentId = obj.consentId ? "**********" : null; // Mask consentId in API responses
     return obj;
 };
 

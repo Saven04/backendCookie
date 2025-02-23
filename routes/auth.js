@@ -103,4 +103,29 @@ router.get("/user", authenticateToken, async (req, res) => {
     }
 });
 
+// Link Consent ID to User (NEW ENDPOINT)
+router.post("/link-consent", async (req, res) => {
+    try {
+        const { userId, consentId } = req.body;
+
+        if (!userId || !consentId) {
+            return res.status(400).json({ error: "User ID and Consent ID are required" });
+        }
+
+        // Find user and update consent ID
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        user.consentId = consentId;
+        await user.save();
+
+        return res.status(200).json({ message: "Consent ID linked successfully" });
+    } catch (error) {
+        console.error("❌ Error linking consent ID:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
 module.exports = router;

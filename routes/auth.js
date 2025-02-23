@@ -44,15 +44,9 @@ router.post("/register", async (req, res) => {
 });
 
 // POST /login - Authenticate a user
-
 router.post("/login", async (req, res) => {
     try {
         const { email, password } = req.body;
-
-        // Validate input
-        if (!email || !password) {
-            return res.status(400).json({ message: "Email and password are required." });
-        }
 
         // Find the user by email
         const user = await User.findOne({ email });
@@ -69,19 +63,12 @@ router.post("/login", async (req, res) => {
         // Create a session for the user
         req.session.userId = user._id; // Store the user's ID in the session
 
-        // Return success response
-        res.status(200).json({
-            message: "Login successful!",
-            userId: user._id,
-            email: user.email, // Optionally include additional user details
-        });
-
+        res.status(200).json({ message: "Login successful!", userId: user._id });
     } catch (error) {
-        console.error("❌ Error during login:", error);
+        console.error("Error:", error);
         res.status(500).json({ message: "Server error. Please try again later." });
     }
 });
-
 
 // GET /check-auth - Check if the user is authenticated
 
@@ -101,4 +88,3 @@ router.get("/check-auth", (req, res) => {
 });
 
 module.exports = router;
-

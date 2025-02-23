@@ -1,6 +1,7 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
-const User = require("../models/user"); // MongoDB User model
+const User = require("../models/user"); 
+const jwt = require("jsonwebtoken");
 const router = express.Router();
 
 // Middleware to parse JSON bodies
@@ -48,22 +49,22 @@ router.post("/login", async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // Find the user by email
+        // Find the user
         const user = await User.findOne({ email });
         if (!user) {
             return res.status(400).json({ message: "Invalid email or password." });
         }
 
-        // Compare the provided password with the stored hashed password
+        // Compare passwords
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
             return res.status(400).json({ message: "Invalid email or password." });
         }
 
-        // Create a session for the user
-        req.session.userId = user._id; // Store the user's ID in the session
+        // Generate JWT token
+        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
-        res.status(200).json({ message: "Login successful!", userId: user._id });
+        res.status(200).json({ message: "Login successful!", token });
     } catch (error) {
         console.error("Error:", error);
         res.status(500).json({ message: "Server error. Please try again later." });

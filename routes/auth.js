@@ -9,7 +9,12 @@ router.use(express.json());
 // POST /register - Register a new user
 router.post("/register", async (req, res) => {
     try {
-        const { username, email, password } = req.body;
+        const { username, email, password, consentId } = req.body;
+
+        // Validate inputs
+        if (!username || !email || !password || !consentId) {
+            return res.status(400).json({ message: "All fields are required!" });
+        }
 
         // Check if user already exists
         const existingUser = await User.findOne({ email });
@@ -21,8 +26,14 @@ router.post("/register", async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Create new user
-        const newUser = new User({ username, email, password: hashedPassword });
+        // Create new user and link the consentId
+        const newUser = new User({
+            username,
+            email,
+            password: hashedPassword,
+            consentId, // Link the short consentId provided by the frontend
+        });
+
         await newUser.save();
 
         res.status(201).json({ message: "User registered successfully!" });

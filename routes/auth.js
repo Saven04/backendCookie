@@ -5,7 +5,7 @@ const crypto = require("crypto"); // For generating UUIDs
 const User = require("../models/user"); // MongoDB User model
 
 const router = express.Router();
-const SECRET_KEY = "your_secret_key"; // Replace with a secure secret key
+const SECRET_KEY = "32b3d47ef5ed82cb2e8202b0b29e37a18037a228133507f973a8fec946e03b8d"; // Replace with a secure secret key
 
 // Register Route
 router.post("/register", async (req, res) => {

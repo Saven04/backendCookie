@@ -46,7 +46,7 @@ const connectDB = async () => {
     await mongoose.connect(process.env.MONGO_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      dbName: "yourDatabaseName",
+      dbName: "CookieDB",
     });
     console.log("✅ Connected to MongoDB successfully");
   } catch (err) {
@@ -58,7 +58,7 @@ connectDB();
 
 // Routes
 app.use("/api", cookieRoutes); // Cookie-related routes
-app.use("/api", authRoutes); // ✅ Changed to "/api" to match frontend requests
+app.use("/api/auth", authRoutes); 
 
 // ✅ Route to get the real client IP and fetch geolocation data from `ip-api.com`
 app.get("/api/get-ipinfo", async (req, res) => {

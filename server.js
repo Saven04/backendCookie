@@ -60,7 +60,7 @@ connectDB();
 
 // Routes
 app.use("/api", cookieRoutes); // Cookie-related routes
-app.use("/api", authRoutes); 
+app.use("/api/auth", authRoutes); 
 
 // Pseudo-code for backend (Node.js/Express example)
 let consentCounter = 0; // Initialize counter (in production, use a database)

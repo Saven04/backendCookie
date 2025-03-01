@@ -62,7 +62,24 @@ connectDB();
 app.use("/api", cookieRoutes); // Cookie-related routes
 app.use("/api", authRoutes); 
 
+// Pseudo-code for backend (Node.js/Express example)
+let consentCounter = 0; // Initialize counter (in production, use a database)
 
+app.post("/api/generate-consent-id", async (req, res) => {
+    try {
+        // Increment the counter (in production, fetch and update from the database)
+        consentCounter += 1;
+
+        // Generate the consentId
+        const consentId = `CID-${consentCounter}`;
+
+        // Return the consentId to the frontend
+        res.json({ consentId });
+    } catch (error) {
+        console.error("Error generating consentId:", error);
+        res.status(500).json({ error: "Failed to generate consentId" });
+    }
+});
 
 // ✅ Route to get the real client IP and fetch geolocation data from `ip-api.com`
 app.get("/api/get-ipinfo", async (req, res) => {

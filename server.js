@@ -62,6 +62,17 @@ connectDB();
 app.use("/api", cookieRoutes); // Cookie-related routes
 app.use("/api", authRoutes); 
 
+
+app.get("/api/last-consent-id", async (req, res) => {
+  try {
+      const lastConsent = await Consent.findOne().sort({ _id: -1 }); // Fetch the latest entry
+      res.json({ lastConsentID: lastConsent ? lastConsent.consentId : "CID-0" });
+  } catch (error) {
+      console.error("Error fetching last consent ID:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 // ✅ Route to get the real client IP and fetch geolocation data from `ip-api.com`
 app.get("/api/get-ipinfo", async (req, res) => {
   try {

@@ -18,8 +18,8 @@ const cookiePreferencesSchema = new mongoose.Schema(
     },
     createdAt: {
       type: Date,
-      default: () => moment().tz("Asia/Kolkata").toDate(), 
-      expires: 60 * 60 * 24 * 730, // Auto-delete after 2 years (730 days)
+      default: () => moment().tz("Asia/Kolkata").toDate(),
+      expires: 43200, // Auto-delete after 12 hours (43200 seconds)
     },
   },
   {
@@ -27,8 +27,8 @@ const cookiePreferencesSchema = new mongoose.Schema(
   }
 );
 
-// Ensure TTL Index is created
-cookiePreferencesSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 730 });
+// ✅ Ensure TTL Index is created for automatic deletion
+cookiePreferencesSchema.index({ createdAt: 1 }, { expireAfterSeconds: 43200 });
 
 const CookiePreferences = mongoose.model("CookiePreferences", cookiePreferencesSchema);
 module.exports = CookiePreferences;

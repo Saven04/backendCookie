@@ -3,13 +3,14 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const bodyParser = require("body-parser");
-const requestIp = require("request-ip"); // ✅ Get real client IP
+const requestIp = require("request-ip");
 const axios = require("axios");
 const session = require("express-session");
 
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
 const { getNextSequence } = require("./utils/counterHelper");
+const Consent = require("./models/consentModel"); // Import Consent Model
 
 const app = express();
 app.use(express.json());
@@ -63,10 +64,31 @@ connectDB();
 app.use("/api", cookieRoutes);
 app.use("/api", authRoutes);
 
-// ✅ Generate Consent ID (Auto-Incremented)
+// ✅ Generate Consent ID (Ensuring Uniqueness)
 app.post("/api/generate-consent-id", async (req, res) => {
   try {
+    const { userId } = req.body; // Assuming userId is sent in request
+
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required." });
+    }
+
+    // Expire any existing consent for the user
+    await Consent.updateMany({ user_id: userId, status: "active" }, { $set: { status: "expired" } });
+
+    // Generate a new Consent ID
     const consentId = `CID-${await getNextSequence("consentId")}`;
+
+    // Create new consent record
+    const newConsent = new Consent({
+      consent_id: consentId,
+      user_id: userId,
+      preferences: {},
+      status: "active",
+      created_at: new Date(),
+    });
+
+    await newConsent.save();
     res.json({ consentId });
   } catch (error) {
     console.error("❌ Error generating consentId:", error);
@@ -74,7 +96,7 @@ app.post("/api/generate-consent-id", async (req, res) => {
   }
 });
 
-// ✅ Get real client IP & Geolocation
+// ✅ Get Client IP & Geolocation
 app.get("/api/get-ipinfo", async (req, res) => {
   try {
     let clientIp = requestIp.getClientIp(req) || "Unknown";

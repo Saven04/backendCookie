@@ -6,7 +6,7 @@ const router = express.Router();
 
 // Middleware to parse JSON bodies
 router.use(express.json());
-
+const JWT_SECRET = process.env.JWT_SECRET || "5d36bf58f0cc3c17a4e8e177d23d11f1890aa00739f15af79999dc2a6a4bc23ed3ce6991f8ebe37fa81158cc79d63f8451627ac7912d985736dd1a4801654da7";
 // POST /register - Register a new user
 router.post("/register", async (req, res) => {
     try {
@@ -47,26 +47,43 @@ router.post("/register", async (req, res) => {
 // POST /login - Authenticate a user
 router.post("/login", async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { userInput, password } = req.body;
 
-        // Find the user
-        const user = await User.findOne({ email });
-        if (!user) {
-            return res.status(400).json({ message: "Invalid email or password." });
+        // Ensure input exists
+        if (!userInput || !password) {
+            return res.status(400).json({ message: "Username or Email and Password are required." });
         }
 
-        // Compare passwords
+        // Determine if userInput is an email or a username
+        const isEmail = userInput.includes("@");
+
+        // Find user by email or username
+        const user = await User.findOne(isEmail ? { email: userInput } : { username: userInput });
+
+        if (!user) {
+            return res.status(400).json({ message: "Invalid username or email." });
+        }
+
+        // Validate password
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            return res.status(400).json({ message: "Invalid email or password." });
+            return res.status(400).json({ message: "Invalid password." });
         }
 
         // Generate JWT token
-        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+        const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: "1h" });
 
-        res.status(200).json({ message: "Login successful!", token });
+        res.status(200).json({
+            message: "Login successful!",
+            token,
+            user: {
+                id: user._id,
+                username: user.username,
+                email: user.email,
+            },
+        });
     } catch (error) {
-        console.error("Error:", error);
+        console.error("Login Error:", error);
         res.status(500).json({ message: "Server error. Please try again later." });
     }
 });

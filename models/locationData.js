@@ -7,8 +7,6 @@ const locationSchema = new mongoose.Schema(
     isp: { type: String, required: true },
     city: { type: String, required: true },
     country: { type: String, required: true },
-    latitude: { type: Number },
-    longitude: { type: Number },
     createdAt: { type: Date, default: Date.now, expires: 60 * 60 * 24 * 90 }, // Auto-delete after 90 days
   },
   { timestamps: true }

@@ -2,69 +2,73 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const User = require("../models/user"); 
 const jwt = require("jsonwebtoken");
-const router = express.Router();
+const crypto = require("crypto");
 
-// Middleware to parse JSON bodies
+const router = express.Router();
 router.use(express.json());
-const JWT_SECRET = process.env.JWT_SECRET || "5d36bf58f0cc3c17a4e8e177d23d11f1890aa00739f15af79999dc2a6a4bc23ed3ce6991f8ebe37fa81158cc79d63f8451627ac7912d985736dd1a4801654da7";
-// POST /register - Register a new user
+
+// JWT Secret Key (Ensure to set this in your environment variables)
+const JWT_SECRET = process.env.JWT_SECRET || "your-secure-jwt-secret";
+
+// **Generate Unique Consent ID (if not provided)**
+const generateConsentId = () => `CID-${crypto.randomUUID().split('-')[0]}`;
+
+// **POST /register - Register a new user**
 router.post("/register", async (req, res) => {
     try {
         const { username, email, password, consentId } = req.body;
 
         // Validate inputs
-        if (!username || !email || !password || !consentId) {
+        if (!username || !email || !password) {
             return res.status(400).json({ message: "All fields are required!" });
         }
 
-        // Check if user already exists
-        const existingUser = await User.findOne({ email });
+        // Check if the email already exists
+        const existingUser = await User.findOne({ email: email.toLowerCase() });
         if (existingUser) {
-            return res.status(400).json({ message: "Email already in use!" });
+            return res.status(400).json({ message: "Email is already in use!" });
         }
 
         // Hash the password
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
+        const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Create new user and link the consentId
+        // Create new user with auto-generated consentId if not provided
         const newUser = new User({
             username,
-            email,
+            email: email.toLowerCase(), // Normalize email
             password: hashedPassword,
-            consentId, // Link the short consentId provided by the frontend
+            consentId: consentId || generateConsentId(), // Assign unique consent ID if missing
         });
 
         await newUser.save();
-
         res.status(201).json({ message: "User registered successfully!" });
+
     } catch (error) {
-        console.error("Error:", error);
+        console.error("❌ Registration Error:", error);
         res.status(500).json({ message: "Server error. Please try again later." });
     }
 });
 
-// POST /login - Authenticate a user
+// **POST /login - Authenticate user**
 router.post("/login", async (req, res) => {
     try {
         const { userInput, password } = req.body;
 
-        // Ensure input exists
         if (!userInput || !password) {
-            return res.status(400).json({ message: "Username or Email and Password are required." });
+            return res.status(400).json({ message: "Username/Email and Password are required." });
         }
 
         // Determine if userInput is an email or a username
         const isEmail = userInput.includes("@");
+        const query = isEmail ? { email: userInput.toLowerCase() } : { username: userInput };
 
-        // Find user by email or username
-        const user = await User.findOne(isEmail ? { email: userInput } : { username: userInput });
-
+        // Find user
+        const user = await User.findOne(query);
         if (!user) {
             return res.status(400).json({ message: "Invalid username or email." });
         }
 
-        // Validate password
+        // Verify password
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
             return res.status(400).json({ message: "Invalid password." });
@@ -80,28 +84,41 @@ router.post("/login", async (req, res) => {
                 id: user._id,
                 username: user.username,
                 email: user.email,
+                consentId: user.consentId,
             },
         });
+
     } catch (error) {
-        console.error("Login Error:", error);
+        console.error("❌ Login Error:", error);
         res.status(500).json({ message: "Server error. Please try again later." });
     }
 });
 
-// GET /check-auth - Check if the user is authenticated
-
-// Middleware to check authentication status
-router.get("/check-auth", (req, res) => {
+// **GET /check-auth - Verify authentication status**
+router.get("/check-auth", async (req, res) => {
     try {
-        // Check if the session contains a userId
-        if (req.session && req.session.userId) {
-            return res.status(200).json({ authenticated: true });
-        } else {
-            return res.status(200).json({ authenticated: false });
+        const token = req.headers.authorization?.split(" ")[1]; // Extract token from Authorization header
+
+        if (!token) {
+            return res.status(401).json({ authenticated: false, message: "No token provided." });
         }
+
+        jwt.verify(token, JWT_SECRET, async (err, decoded) => {
+            if (err) {
+                return res.status(401).json({ authenticated: false, message: "Invalid token." });
+            }
+
+            const user = await User.findById(decoded.userId).select("-password");
+            if (!user) {
+                return res.status(404).json({ authenticated: false, message: "User not found." });
+            }
+
+            res.status(200).json({ authenticated: true, user });
+        });
+
     } catch (error) {
-        console.error("❌ Error in /check-auth:", error);
-        return res.status(500).json({ error: "Internal Server Error" });
+        console.error("❌ Auth Check Error:", error);
+        res.status(500).json({ message: "Internal Server Error" });
     }
 });
 

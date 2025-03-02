@@ -5,21 +5,21 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 const requestIp = require("request-ip"); // ✅ Get real client IP
 const axios = require("axios");
-const session = require("express-session"); 
+const session = require("express-session");
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
+const Consent = require("./models/counter"); 
+
 const app = express();
-
-
-
 app.use(express.json());
+
 // CORS Configuration
 const allowedOrigins = ["https://t10hits.netlify.app"];
 app.use(
   cors({
     origin: allowedOrigins,
     credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"], // Allow credentials headers
+    allowedHeaders: ["Content-Type", "Authorization"],
     methods: ["GET", "POST", "PUT", "DELETE"],
   })
 );
@@ -31,11 +31,11 @@ app.use(requestIp.mw()); // ✅ Middleware to capture client IP
 // Session Configuration
 app.use(
   session({
-    secret: process.env.SESSION_SECRET, // Use a strong secret key
+    secret: process.env.SESSION_SECRET || "fallback_secret",
     resave: false,
     saveUninitialized: true,
     cookie: {
-      secure: process.env.NODE_ENV === "production", // Use `secure` cookies in production (HTTPS)
+      secure: process.env.NODE_ENV === "production",
       httpOnly: true,
       sameSite: "strict",
     },
@@ -59,48 +59,49 @@ const connectDB = async () => {
 connectDB();
 
 // Routes
-app.use("/api", cookieRoutes); // Cookie-related routes
-app.use("/api", authRoutes); 
+app.use("/api", cookieRoutes);
+app.use("/api", authRoutes);
 
-// Pseudo-code for backend (Node.js/Express example)
-let consentCounter = 0; // Initialize counter (in production, use a database)
-
+// Generate short Consent ID (Production Ready)
 app.post("/api/generate-consent-id", async (req, res) => {
-    try {
-        // Increment the counter (in production, fetch and update from the database)
-        consentCounter += 1;
+  try {
+    // Fetch the last stored consent count from MongoDB
+    const lastConsent = await Consent.findOne().sort({ _id: -1 });
 
-        // Generate the consentId
-        const consentId = `CID-${consentCounter}`;
+    // Generate a new Consent ID
+    const lastCounter = lastConsent ? parseInt(lastConsent.consentId.split("-")[1]) : 0;
+    const newCounter = lastCounter + 1;
+    const consentId = `CID-${newCounter}`;
 
-        // Return the consentId to the frontend
-        res.json({ consentId });
-    } catch (error) {
-        console.error("Error generating consentId:", error);
-        res.status(500).json({ error: "Failed to generate consentId" });
-    }
+    res.json({ consentId });
+  } catch (error) {
+    console.error("❌ Error generating consentId:", error);
+    res.status(500).json({ error: "Failed to generate consentId" });
+  }
 });
 
-// ✅ Route to get the real client IP and fetch geolocation data from `ip-api.com`
+// ✅ Get real client IP & geolocation
 app.get("/api/get-ipinfo", async (req, res) => {
   try {
     let clientIp = requestIp.getClientIp(req) || "Unknown";
-
     if (clientIp.includes("::ffff:")) {
       clientIp = clientIp.split("::ffff:")[1];
     }
 
     console.log("📌 Detected Client IP:", clientIp);
+    
+    // Use ipinfo.io API (Replace 'YOUR_ACCESS_TOKEN' with your actual token)
+    const response = await axios.get(`https://ipinfo.io/${clientIp}/json?token=10772b28291307`);
 
-    // Fetch geolocation data from `ip-api.com`
-    const response = await axios.get(`http://ip-api.com/json/${clientIp}`);
+    // Extract location data
+    const { city, region, country, org } = response.data;
 
     res.json({
       ip: clientIp,
-      city: response.data.city || "Unknown",
-      region: response.data.regionName || "Unknown",
-      country: response.data.country || "Unknown",
-      isp: response.data.isp || "Unknown",
+      city: city || "Unknown",
+      region: region || "Unknown",
+      country: country || "Unknown",
+      isp: org || "Unknown",
     });
   } catch (error) {
     console.error("❌ Error fetching IP info:", error.message);
@@ -108,33 +109,6 @@ app.get("/api/get-ipinfo", async (req, res) => {
   }
 });
 
-
-app.post("/api/login", async (req, res) => {
-  try {
-      console.log("Received login request:", req.body); // Debug log
-
-      const { email, password } = req.body;
-      if (!email || !password) {
-          return res.status(400).json({ message: "Email and password are required" });
-      }
-
-      const user = await User.findOne({ email });
-      if (!user) {
-          return res.status(401).json({ message: "Invalid credentials" });
-      }
-
-      const isMatch = await bcrypt.compare(password, user.password);
-      if (!isMatch) {
-          return res.status(401).json({ message: "Invalid credentials" });
-      }
-
-      const token = jwt.sign({ id: user._id }, "secret_key", { expiresIn: "1h" });
-      return res.json({ token, user });
-  } catch (error) {
-      console.error("Login error:", error);
-      return res.status(500).json({ message: "Internal server error" });
-  }
-});
 
 // Health check route
 app.get("/", (req, res) => {

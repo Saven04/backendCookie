@@ -6,14 +6,15 @@ const bodyParser = require("body-parser");
 const requestIp = require("request-ip"); // ✅ Get real client IP
 const axios = require("axios");
 const session = require("express-session");
+
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
-const Consent = require("./models/counter"); 
+const { getNextSequence } = require("./utils/counterHelper");
 
 const app = express();
 app.use(express.json());
 
-// CORS Configuration
+// ✅ CORS Configuration
 const allowedOrigins = ["https://t10hits.netlify.app"];
 app.use(
   cors({
@@ -24,16 +25,16 @@ app.use(
   })
 );
 
-// Middleware
+// ✅ Middleware
 app.use(bodyParser.json());
-app.use(requestIp.mw()); // ✅ Middleware to capture client IP
+app.use(requestIp.mw()); // Capture client IP
 
-// Session Configuration
+// ✅ Session Configuration
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "fallback_secret",
     resave: false,
-    saveUninitialized: true,
+    saveUninitialized: false,
     cookie: {
       secure: process.env.NODE_ENV === "production",
       httpOnly: true,
@@ -42,7 +43,7 @@ app.use(
   })
 );
 
-// Connect to MongoDB
+// ✅ Connect to MongoDB with Retry Mechanism
 const connectDB = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI, {
@@ -53,26 +54,19 @@ const connectDB = async () => {
     console.log("✅ Connected to MongoDB successfully");
   } catch (err) {
     console.error("❌ MongoDB connection error:", err);
-    process.exit(1);
+    setTimeout(connectDB, 5000); // Retry after 5 seconds
   }
 };
 connectDB();
 
-// Routes
+// ✅ Routes
 app.use("/api", cookieRoutes);
 app.use("/api", authRoutes);
 
-// Generate short Consent ID (Production Ready)
+// ✅ Generate Consent ID (Auto-Incremented)
 app.post("/api/generate-consent-id", async (req, res) => {
   try {
-    // Fetch the last stored consent count from MongoDB
-    const lastConsent = await Consent.findOne().sort({ _id: -1 });
-
-    // Generate a new Consent ID
-    const lastCounter = lastConsent ? parseInt(lastConsent.consentId.split("-")[1]) : 0;
-    const newCounter = lastCounter + 1;
-    const consentId = `CID-${newCounter}`;
-
+    const consentId = `CID-${await getNextSequence("consentId")}`;
     res.json({ consentId });
   } catch (error) {
     console.error("❌ Error generating consentId:", error);
@@ -80,7 +74,7 @@ app.post("/api/generate-consent-id", async (req, res) => {
   }
 });
 
-// ✅ Get real client IP & geolocation
+// ✅ Get real client IP & Geolocation
 app.get("/api/get-ipinfo", async (req, res) => {
   try {
     let clientIp = requestIp.getClientIp(req) || "Unknown";
@@ -89,11 +83,8 @@ app.get("/api/get-ipinfo", async (req, res) => {
     }
 
     console.log("📌 Detected Client IP:", clientIp);
-    
-    // Use ipinfo.io API (Replace 'YOUR_ACCESS_TOKEN' with your actual token)
-    const response = await axios.get(`https://ipinfo.io/${clientIp}/json?token=10772b28291307`);
 
-    // Extract location data
+    const response = await axios.get(`https://ipinfo.io/${clientIp}/json?token=10772b28291307`);
     const { city, region, country, org } = response.data;
 
     res.json({
@@ -109,18 +100,17 @@ app.get("/api/get-ipinfo", async (req, res) => {
   }
 });
 
-
-// Health check route
+// ✅ Health Check Route
 app.get("/", (req, res) => {
-  res.status(200).json({ message: "✅ Server is running on Render and healthy." });
+  res.status(200).json({ message: "✅ Server is running and healthy." });
 });
 
-// 404 Handler
-app.use((req, res, next) => {
+// ✅ 404 Handler
+app.use((req, res) => {
   res.status(404).json({ message: "❌ Route not found." });
 });
 
-// Start the server
+// ✅ Start the Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);

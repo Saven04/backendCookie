@@ -1,20 +1,18 @@
 const express = require("express");
 const router = express.Router();
 const Cookie = require("../models/cookiePreference");
-const crypto = require("crypto");
-
-// Function to generate a short, unique consent ID
-const generateShortId = () => {
-  return crypto.randomBytes(6).toString("base64")
-    .replace(/[+/=]/g, "")
-    .slice(0, 8);
-};
+const { getNextSequence } = require("../utils/counterHelper"); // Import counter function
 
 // Function to save or update user cookie preferences
 const saveCookiePreferences = async (consentId, preferences) => {
   try {
-    if (!consentId || !preferences) {
-      throw new Error("Consent ID and preferences are required.");
+    if (!consentId) {
+      // Generate a new consentId if not provided
+      consentId = await getNextSequence("consentId");
+    }
+
+    if (!preferences || typeof preferences !== "object" || Object.keys(preferences).length === 0) {
+      throw new Error("Preferences must be a non-empty object.");
     }
 
     console.log(`🔹 Processing Consent ID: ${consentId}`);
@@ -69,7 +67,7 @@ router.post("/save", async (req, res) => {
     }
 
     if (!consentId) {
-      consentId = generateShortId();
+      consentId = await getNextSequence("consentId"); // Use counter-based ID
       console.log(`🔹 Generated new Consent ID: ${consentId}`);
     } else {
       console.log(`✅ Received existing Consent ID: ${consentId}`);

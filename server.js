@@ -10,7 +10,7 @@ const session = require("express-session");
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
 const { getNextSequence } = require("./utils/counterHelper");
-const Consent = require("./models/consentModel"); // Import Consent Model
+const Consent = require("./models/cookiePreference"); 
 
 const app = express();
 app.use(express.json());

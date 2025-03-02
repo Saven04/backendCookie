@@ -6,7 +6,6 @@ const bodyParser = require("body-parser");
 const requestIp = require("request-ip");
 const axios = require("axios");
 const session = require("express-session");
-const { createClient } = require("@supabase/supabase-js");
 
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
@@ -61,55 +60,9 @@ const connectDB = async () => {
 };
 connectDB();
 
-// ✅ Supabase Initialization
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
-
 // ✅ Routes
 app.use("/api", cookieRoutes);
 app.use("/api", authRoutes);
-
-// ✅ Request MFA OTP
-app.post("/api/request-mfa", async (req, res) => {
-  try {
-    const { userEmail } = req.body;
-    if (!userEmail) return res.status(400).json({ error: "Email is required." });
-
-    const { error } = await supabase.auth.signInWithOtp({ email: userEmail });
-    if (error) return res.status(500).json({ error: "Failed to send OTP." });
-
-    res.json({ message: "OTP sent to your email." });
-  } catch (error) {
-    console.error("❌ Error sending MFA OTP:", error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
-
-// ✅ Verify MFA OTP & Delete Data
-app.post("/api/verify-mfa-and-delete-data", async (req, res) => {
-  try {
-    const { userEmail, otpCode } = req.body;
-    if (!userEmail || !otpCode) return res.status(400).json({ error: "Email and OTP are required." });
-
-    // Verify OTP
-    const { data, error } = await supabase.auth.verifyOtp({
-      email: userEmail,
-      token: otpCode,
-      type: "email",
-    });
-
-    if (error) return res.status(401).json({ error: "Invalid or expired OTP." });
-
-    // Delete user data after successful MFA verification
-    await Consent.deleteMany({ user_email: userEmail });
-    await mongoose.connection.db.collection("preferences").deleteMany({ user_email: userEmail });
-    await mongoose.connection.db.collection("locationData").deleteMany({ user_email: userEmail });
-
-    res.json({ success: true, message: "All user data deleted successfully." });
-  } catch (error) {
-    console.error("❌ Error verifying OTP or deleting data:", error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
 
 // ✅ Generate Consent ID (Ensuring Uniqueness)
 app.post("/api/generate-consent-id", async (req, res) => {

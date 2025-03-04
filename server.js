@@ -14,7 +14,7 @@ const newsRoutes = require("./routes/newsRoutes");
 const consentRoutes = require("./routes/consentRoutes");
 const User = require("./models/user"); // Import User model
 const supabase = require("./config/supabaseClient"); // Supabase client setup
-const { verifyMfa } = require("./utils/mfaVer"); // MFA verification function
+const { verifyMfa } = require("./utils/mfa"); // MFA verification function
 
 const app = express();
 

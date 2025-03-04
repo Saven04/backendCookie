@@ -18,6 +18,14 @@ const { verifyMfa } = require("./utils/mfa"); // MFA verification function
 
 const app = express();
 
+// 🔹 Debug Supabase Import
+if (!supabase) {
+  console.error("❌ Supabase is not initialized!");
+  process.exit(1);
+} else {
+  console.log("✅ Supabase initialized successfully.");
+}
+
 // ✅ Middleware
 app.use(express.json());
 app.use(bodyParser.json());
@@ -35,6 +43,10 @@ app.use(
 );
 
 // ✅ Session Configuration
+if (!process.env.SESSION_SECRET) {
+  console.error("❌ SESSION_SECRET is missing from .env file!");
+  process.exit(1);
+}
 app.use(
   session({
     secret: process.env.SESSION_SECRET, // Strong secret key
@@ -49,6 +61,10 @@ app.use(
 );
 
 // ✅ Connect to MongoDB
+if (!process.env.MONGO_URI) {
+  console.error("❌ MONGO_URI is missing from .env file!");
+  process.exit(1);
+}
 const connectDB = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI, {
@@ -99,7 +115,7 @@ app.get("/api/get-ipinfo", async (req, res) => {
 // ✅ Secure Login with Supabase MFA
 app.post("/api/login", async (req, res) => {
   try {
-    console.log("Received login request:", req.body);
+    console.log("📩 Received login request:", req.body);
 
     const { email, password, mfaCode } = req.body;
     if (!email || !password) {
@@ -116,10 +132,19 @@ app.post("/api/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
+    if (!user.consentId) {
+      return res.status(400).json({ message: "User consent ID is missing." });
+    }
+
     // 🔹 Step 1: Verify MFA before issuing JWT
     const isMfaValid = await verifyMfa(user.consentId, mfaCode, "email");
     if (!isMfaValid) {
       return res.status(401).json({ message: "Invalid MFA code" });
+    }
+
+    if (!process.env.JWT_SECRET) {
+      console.error("❌ JWT_SECRET is missing from .env file!");
+      process.exit(1);
     }
 
     // 🔹 Step 2: Generate Secure JWT Token
@@ -127,14 +152,14 @@ app.post("/api/login", async (req, res) => {
 
     res.json({ token, user });
   } catch (error) {
-    console.error("Login error:", error);
+    console.error("❌ Login error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
 
 // ✅ Health Check Route
 app.get("/", (req, res) => {
-  res.status(200).json({ message: "✅ Server is running on Render and healthy." });
+  res.status(200).json({ message: "✅ Server is running and healthy." });
 });
 
 // ✅ 404 Handler

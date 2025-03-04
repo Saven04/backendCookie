@@ -1,22 +1,35 @@
-const { createClient } = require("@supabase/supabase-js");
+require("dotenv").config(); // Load environment variables
+const { MongoClient } = require("mongodb");
 
-const supabaseUrl = "https://ieyefjxdupzywnmqltnw.supabase.co";
-const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlleWVmanhkdXB6eXdubXFsdG53Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA5MTg2ODIsImV4cCI6MjA1NjQ5NDY4Mn0.Bcl4f67ub3t0MCveOq1zlO9-bD5uRbv12mu-ONG0Whc";
-const supabase = createClient(supabaseUrl, supabaseKey);
+const mongoUri = process.env.MONGO_URI; // Read from .env
+const client = new MongoClient(mongoUri);
 
 async function verifyMfa(consentId, mfaCode, method = "email") {
     try {
+        await client.connect();
+        const db = client.db(process.env.DB_NAME); // Database name from .env
+        const usersCollection = db.collection("users"); // Collection name
+
+        // Fetch user details based on Consent ID
+        const user = await usersCollection.findOne({ consent_id: consentId });
+
+        if (!user) {
+            throw new Error("User not found for given Consent ID");
+        }
+
         let verificationData;
-        
+
         if (method === "sms") {
+            if (!user.phone) throw new Error("User phone number not found");
             verificationData = {
-                phone: `+91XXXXXXXXXX`, // Fetch user's phone number from DB
+                phone: user.phone,
                 token: mfaCode,
                 type: "sms"
             };
         } else if (method === "email") {
+            if (!user.email) throw new Error("User email not found");
             verificationData = {
-                email: "user@example.com", // Fetch user's email from DB
+                email: user.email,
                 token: mfaCode,
                 type: "email"
             };
@@ -24,17 +37,20 @@ async function verifyMfa(consentId, mfaCode, method = "email") {
             throw new Error("Invalid MFA method. Use 'sms' or 'email'.");
         }
 
-        const { data, error } = await supabase.auth.verifyOtp(verificationData);
-
-        if (error) {
-            console.error("MFA Verification Error:", error.message);
+        // Check if MFA code matches the stored OTP
+        const storedOtp = user.otp; // Assuming OTP is stored in `otp` field
+        if (storedOtp !== mfaCode) {
+            console.error("MFA Verification Error: Invalid OTP");
             return false;
         }
 
+        console.log("✅ MFA Verification Successful");
         return true;
     } catch (error) {
-        console.error("Error in verifyMfa:", error.message);
+        console.error("❌ Error in verifyMfa:", error.message);
         return false;
+    } finally {
+        await client.close();
     }
 }
 

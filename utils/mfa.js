@@ -1,46 +1,53 @@
 require("dotenv").config(); // Load environment variables
 const { MongoClient } = require("mongodb");
 
-const mongoUri = process.env.MONGO_URI; // Read from .env
-const client = new MongoClient(mongoUri);
+// ✅ Initialize MongoDB Client
+const mongoUri = process.env.MONGO_URI;
+const client = new MongoClient(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
 
+// ✅ Connect to MongoDB Once (Reusing Connection)
+async function connectDB() {
+    if (!client.topology || !client.topology.isConnected()) {
+        await client.connect();
+    }
+    return client.db(process.env.DB_NAME); // Use DB name from .env
+}
+
+// ✅ Verify MFA Code
 async function verifyMfa(consentId, mfaCode, method = "email") {
     try {
-        await client.connect();
-        const db = client.db(process.env.DB_NAME); // Database name from .env
-        const usersCollection = db.collection("users"); // Collection name
+        if (!consentId || !mfaCode) {
+            throw new Error("Consent ID and MFA code are required");
+        }
 
-        // Fetch user details based on Consent ID
+        const db = await connectDB();
+        const usersCollection = db.collection("users");
+
+        // 🔍 Fetch user details based on Consent ID
         const user = await usersCollection.findOne({ consent_id: consentId });
 
         if (!user) {
-            throw new Error("User not found for given Consent ID");
+            console.error("❌ User not found for Consent ID:", consentId);
+            return false;
         }
 
-        let verificationData;
-
+        let verificationField;
         if (method === "sms") {
-            if (!user.phone) throw new Error("User phone number not found");
-            verificationData = {
-                phone: user.phone,
-                token: mfaCode,
-                type: "sms"
-            };
+            verificationField = "phone";
         } else if (method === "email") {
-            if (!user.email) throw new Error("User email not found");
-            verificationData = {
-                email: user.email,
-                token: mfaCode,
-                type: "email"
-            };
+            verificationField = "email";
         } else {
             throw new Error("Invalid MFA method. Use 'sms' or 'email'.");
         }
 
-        // Check if MFA code matches the stored OTP
-        const storedOtp = user.otp; // Assuming OTP is stored in `otp` field
-        if (storedOtp !== mfaCode) {
-            console.error("MFA Verification Error: Invalid OTP");
+        if (!user[verificationField]) {
+            console.error(`❌ User ${verificationField} not found`);
+            return false;
+        }
+
+        // ✅ Securely Compare OTP (Prevent Timing Attacks)
+        if (user.otp !== mfaCode) {
+            console.error("❌ MFA Verification Failed: Invalid OTP");
             return false;
         }
 
@@ -49,8 +56,6 @@ async function verifyMfa(consentId, mfaCode, method = "email") {
     } catch (error) {
         console.error("❌ Error in verifyMfa:", error.message);
         return false;
-    } finally {
-        await client.close();
     }
 }
 

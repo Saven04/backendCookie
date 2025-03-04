@@ -1,9 +1,9 @@
 const mongoose = require("mongoose");
 const crypto = require("crypto");
 
-// Function to hash email before storing (optional for anonymization)
-function hashEmail(email) {
-    return crypto.createHash("sha256").update(email).digest("hex");
+// Function to hash sensitive data (email/phone)
+function hashData(data) {
+    return crypto.createHash("sha256").update(data).digest("hex");
 }
 
 const UserSchema = new mongoose.Schema(
@@ -16,7 +16,13 @@ const UserSchema = new mongoose.Schema(
         type: String, 
         required: true, 
         unique: true, 
-        set: hashEmail // Store hashed email for privacy
+        set: hashData // Hash email for privacy
+    },
+    phone: {
+        type: String,
+        required: false, // Optional (user may not want to provide it)
+        unique: true,
+        set: hashData // Hash phone for privacy
     },
     password: { 
         type: String, 
@@ -53,6 +59,7 @@ UserSchema.methods.toJSON = function () {
     const obj = this.toObject();
     delete obj.password; // Remove password from API response
     obj.email = obj.email ? "**********" : null; // Mask email
+    obj.phone = obj.phone ? "**********" : null; // Mask phone number
     obj.consentId = obj.consentId ? "**********" : null; // Mask consentId in API responses
     return obj;
 };

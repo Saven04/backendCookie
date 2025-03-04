@@ -9,6 +9,7 @@ const session = require("express-session"); // Add session support
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
 const newsRoutes = require("./routes/newsRoutes");
+const consentRoutes = require("./routes/consentRoutes");
 const app = express();
 
 
@@ -63,6 +64,7 @@ connectDB();
 app.use("/api", cookieRoutes); // Cookie-related routes
 app.use("/api", authRoutes); 
 app.use("/api/news", newsRoutes);
+app.use("/api/consent", consentRoutes);
 
 // ✅ Route to get the real client IP and fetch geolocation data from `ip-api.com`
 app.get("/api/get-ipinfo", async (req, res) => {

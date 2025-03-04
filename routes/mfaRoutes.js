@@ -37,12 +37,12 @@ function generateOtp() {
     return crypto.randomInt(100000, 999999).toString(); // 6-digit OTP
 }
 
-// ✅ 📩 Request MFA OTP (Sends OTP via Email or SMS)
+// ✅ 📩 Request MFA OTP (Sends OTP via Email)
 router.post("/request-mfa", async (req, res) => {
     try {
-        const { consentId, method } = req.body;
-        if (!consentId || !method) {
-            return res.status(400).json({ message: "Consent ID and method are required" });
+        const { consentId } = req.body; // Removed 'method' field since only email is supported now
+        if (!consentId) {
+            return res.status(400).json({ message: "Consent ID is required" });
         }
 
         const db = await connectDB();
@@ -54,30 +54,25 @@ router.post("/request-mfa", async (req, res) => {
             return res.status(404).json({ message: "User not found" });
         }
 
-        let recipient;
-        if (method === "sms" && user.phone) {
-            recipient = user.phone;
-        } else if (method === "email" && user.email) {
-            recipient = user.email;
-        } else {
-            return res.status(400).json({ message: `User ${method} not found` });
+        const recipient = user.email; // Only handle email for MFA
+
+        if (!recipient) {
+            return res.status(400).json({ message: "User email not found" });
         }
 
         // 🔹 Generate and store OTP
         const otp = generateOtp();
         await usersCollection.updateOne({ consent_id: consentId }, { $set: { otp, otp_expires: Date.now() + 300000 } }); // OTP expires in 5 mins
 
-        // 🔹 Send OTP via Email (SMS integration can be added)
-        if (method === "email") {
-            await transporter.sendMail({
-                from: process.env.EMAIL_USER,
-                to: recipient,
-                subject: "Your MFA Code",
-                text: `Your OTP code is: ${otp}. It expires in 5 minutes.`,
-            });
-        }
+        // 🔹 Send OTP via Email
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: recipient,
+            subject: "Your MFA Code",
+            text: `Your OTP code is: ${otp}. It expires in 5 minutes.`,
+        });
 
-        console.log(`✅ OTP sent to ${method}: ${recipient}`);
+        console.log(`✅ OTP sent to email: ${recipient}`);
         res.json({ message: "OTP sent successfully" });
     } catch (error) {
         console.error("❌ Error in /request-mfa:", error.message);
@@ -88,12 +83,12 @@ router.post("/request-mfa", async (req, res) => {
 // ✅ 🔐 Verify MFA OTP
 router.post("/verify-mfa", async (req, res) => {
     try {
-        const { consentId, mfaCode, method } = req.body;
-        if (!consentId || !mfaCode || !method) {
-            return res.status(400).json({ message: "Consent ID, MFA code, and method are required" });
+        const { consentId, mfaCode } = req.body;
+        if (!consentId || !mfaCode) {
+            return res.status(400).json({ message: "Consent ID and MFA code are required" });
         }
 
-        const isValid = await verifyMfa(consentId, mfaCode, method);
+        const isValid = await verifyMfa(consentId, mfaCode, "email"); // Always use email method for MFA
 
         if (!isValid) {
             return res.status(401).json({ message: "Invalid or expired OTP" });

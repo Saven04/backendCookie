@@ -13,8 +13,8 @@ async function connectDB() {
     return client.db(process.env.DB_NAME); // Use DB name from .env
 }
 
-// ✅ Verify MFA Code
-async function verifyMfa(consentId, mfaCode, method = "email") {
+// ✅ Verify MFA Code (Only Email-Based)
+async function verifyMfa(consentId, mfaCode) {
     try {
         if (!consentId || !mfaCode) {
             throw new Error("Consent ID and MFA code are required");
@@ -31,14 +31,8 @@ async function verifyMfa(consentId, mfaCode, method = "email") {
             return false;
         }
 
-        let verificationField;
-        if (method === "sms") {
-            verificationField = "phone";
-        } else if (method === "email") {
-            verificationField = "email";
-        } else {
-            throw new Error("Invalid MFA method. Use 'sms' or 'email'.");
-        }
+        // Only email-based MFA is handled here
+        const verificationField = "email"; // Fixed to email-based MFA
 
         if (!user[verificationField]) {
             console.error(`❌ User ${verificationField} not found`);

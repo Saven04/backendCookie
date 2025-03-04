@@ -102,6 +102,7 @@ app.use("/api", authRoutes);
 app.use("/api/news", newsRoutes);
 app.use("/api/consent", consentRoutes);
 app.use("/api/mfa", mfaRoutes);
+app.use("/api", mfaRoutes);
 
 
 // ✅ Get Client IP & Geolocation Data (Privacy-Aware)

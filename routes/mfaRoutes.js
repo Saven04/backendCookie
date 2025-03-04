@@ -3,9 +3,8 @@ const { MongoClient } = require("mongodb");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 require("dotenv").config();
-
-const router = express.Router();
 const { verifyMfa } = require("../utils/mfa");
+const router = express.Router();
 
 // ✅ Initialize MongoDB Client
 const mongoUri = process.env.MONGO_URI;
@@ -13,10 +12,15 @@ const client = new MongoClient(mongoUri, { useNewUrlParser: true, useUnifiedTopo
 
 // ✅ Connect to MongoDB Once
 async function connectDB() {
-    if (!client.topology || !client.topology.isConnected()) {
-        await client.connect();
+    try {
+        if (!client.isConnected()) {
+            await client.connect();
+        }
+        return client.db(process.env.DB_NAME); // Use DB name from environment
+    } catch (error) {
+        console.error("❌ Error connecting to DB:", error.message);
+        throw new Error("Could not connect to database");
     }
-    return client.db(process.env.DB_NAME);
 }
 
 // ✅ Nodemailer Transporter for Emails

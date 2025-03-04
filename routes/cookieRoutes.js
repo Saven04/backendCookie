@@ -110,30 +110,27 @@ router.post("/location", async (req, res) => {
 
 
 // 👉 **NEW: Route to Delete User Data (Auto & Manual Deletion)**
-router.delete("/delete-my-data/:consentId", async (req, res) => {
-    try {
-        const { consentId } = req.params;
+router.get("/api/get-consent-id", async (req, res) => {
+  try {
+      // Extract JWT from header
+      const token = req.headers.authorization?.split(" ")[1];
+      if (!token) return res.status(401).json({ error: "Unauthorized" });
 
-        if (!consentId) {
-            return res.status(400).json({ error: "Consent ID is required" });
-        }
+      // Verify JWT & get user info
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const user = await User.findOne({ email: decoded.email });
 
-        // Delete user's stored data in parallel
-        const [cookieDeleteResult, locationDeleteResult] = await Promise.all([
-            deleteCookiePreferences(consentId),
-            deleteLocationData(consentId)
-        ]);
+      if (!user || !user.consentId) {
+          return res.status(404).json({ error: "Consent ID not found" });
+      }
 
-        res.status(200).json({ 
-            message: "Your data has been deleted successfully.",
-            cookieDeleteResult,
-            locationDeleteResult
-        });
+      res.json({ consentId: user.consentId });
 
-    } catch (error) {
-        console.error("❌ Error deleting user data:", error);
-        res.status(500).json({ error: "Failed to delete user data." });
-    }
+  } catch (error) {
+      console.error("Error fetching Consent ID:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+  }
 });
+
 
 module.exports = router;

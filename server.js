@@ -86,6 +86,9 @@ app.use("/api", authRoutes);
 app.use("/api/news", newsRoutes);
 app.use("/api/consent", consentRoutes);
 
+
+
+
 // ✅ Get Client IP & Geolocation Data
 app.get("/api/get-ipinfo", async (req, res) => {
   try {

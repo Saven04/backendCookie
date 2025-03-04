@@ -3,48 +3,52 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const bodyParser = require("body-parser");
-const requestIp = require("request-ip"); // ✅ Get real client IP
+const requestIp = require("request-ip");
 const axios = require("axios");
-const session = require("express-session"); // Add session support
+const session = require("express-session");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
 const newsRoutes = require("./routes/newsRoutes");
 const consentRoutes = require("./routes/consentRoutes");
+const User = require("./models/user"); // Import User model
+const supabase = require("./config/supabaseClient"); // Supabase client setup
+const { verifyMfa } = require("./utils/mfaVer"); // MFA verification function
+
 const app = express();
 
-
-
+// ✅ Middleware
 app.use(express.json());
-// CORS Configuration
+app.use(bodyParser.json());
+app.use(requestIp.mw()); // Capture client IP
+
+// ✅ CORS Configuration
 const allowedOrigins = ["https://t10hits.netlify.app"];
 app.use(
   cors({
     origin: allowedOrigins,
     credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"], // Allow credentials headers
+    allowedHeaders: ["Content-Type", "Authorization"],
     methods: ["GET", "POST", "PUT", "DELETE"],
   })
 );
 
-// Middleware
-app.use(bodyParser.json());
-app.use(requestIp.mw()); // ✅ Middleware to capture client IP
-
-// Session Configuration
+// ✅ Session Configuration
 app.use(
   session({
-    secret: process.env.SESSION_SECRET, // Use a strong secret key
+    secret: process.env.SESSION_SECRET, // Strong secret key
     resave: false,
     saveUninitialized: true,
     cookie: {
-      secure: process.env.NODE_ENV === "production", // Use `secure` cookies in production (HTTPS)
+      secure: process.env.NODE_ENV === "production",
       httpOnly: true,
       sameSite: "strict",
     },
   })
 );
 
-// Connect to MongoDB
+// ✅ Connect to MongoDB
 const connectDB = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI, {
@@ -60,13 +64,13 @@ const connectDB = async () => {
 };
 connectDB();
 
-// Routes
-app.use("/api", cookieRoutes); // Cookie-related routes
-app.use("/api", authRoutes); 
+// ✅ Routes
+app.use("/api", cookieRoutes);
+app.use("/api", authRoutes);
 app.use("/api/news", newsRoutes);
 app.use("/api/consent", consentRoutes);
 
-// ✅ Route to get the real client IP and fetch geolocation data from `ip-api.com`
+// ✅ Get Client IP & Geolocation Data
 app.get("/api/get-ipinfo", async (req, res) => {
   try {
     let clientIp = requestIp.getClientIp(req) || "Unknown";
@@ -77,7 +81,6 @@ app.get("/api/get-ipinfo", async (req, res) => {
 
     console.log("📌 Detected Client IP:", clientIp);
 
-    // Fetch geolocation data from `ip-api.com`
     const response = await axios.get(`http://ip-api.com/json/${clientIp}`);
 
     res.json({
@@ -93,48 +96,53 @@ app.get("/api/get-ipinfo", async (req, res) => {
   }
 });
 
-
+// ✅ Secure Login with Supabase MFA
 app.post("/api/login", async (req, res) => {
   try {
-      console.log("Received login request:", req.body); // Debug log
+    console.log("Received login request:", req.body);
 
-      const { email, password } = req.body;
-      if (!email || !password) {
-          return res.status(400).json({ message: "Email and password are required" });
-      }
+    const { email, password, mfaCode } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
 
-      const user = await User.findOne({ email });
-      if (!user) {
-          return res.status(401).json({ message: "Invalid credentials" });
-      }
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
 
-      const isMatch = await bcrypt.compare(password, user.password);
-      if (!isMatch) {
-          return res.status(401).json({ message: "Invalid credentials" });
-      }
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
 
-      const token = jwt.sign({ id: user._id }, "secret_key", { expiresIn: "1h" });
-      return res.json({ token, user });
+    // 🔹 Step 1: Verify MFA before issuing JWT
+    const isMfaValid = await verifyMfa(user.consentId, mfaCode, "email");
+    if (!isMfaValid) {
+      return res.status(401).json({ message: "Invalid MFA code" });
+    }
+
+    // 🔹 Step 2: Generate Secure JWT Token
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+
+    res.json({ token, user });
   } catch (error) {
-      console.error("Login error:", error);
-      return res.status(500).json({ message: "Internal server error" });
+    console.error("Login error:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 });
 
-
-
-
-// Health check route
+// ✅ Health Check Route
 app.get("/", (req, res) => {
   res.status(200).json({ message: "✅ Server is running on Render and healthy." });
 });
 
-// 404 Handler
+// ✅ 404 Handler
 app.use((req, res, next) => {
   res.status(404).json({ message: "❌ Route not found." });
 });
 
-// Start the server
+// ✅ Start the Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);

@@ -3,7 +3,7 @@ const router = express.Router();
 const CookiePreferences = require("../models/cookiePreference");
 const Location = require("../models/locationData");
 const AuditLog = require("../models/auditLog");
-const { verifyMfa } = require("../utils/mfaVerification"); // MFA Verification Function
+const { verifyMfa } = require("../utils/mfaVer"); // MFA Verification Function
 
 // ✅ DELETE USER DATA (GDPR COMPLIANT)
 router.delete("/delete-data", async (req, res) => {

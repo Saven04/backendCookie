@@ -20,11 +20,15 @@ const UserSchema = new mongoose.Schema(
     },
     phone: {
         type: String,
-        required: false, // Optional field
+        required: false,
         unique: true,
-        sparse: true,  // ✅ Allows multiple `null` values (fix for duplicate key error)
-        set: hashData // Hash phone for privacy
+        sparse: true,
+        set: function (phone) {
+            console.log("Raw Phone Input:", phone); // Debugging log
+            return phone ? hashData(phone) : null;
+        }
     },
+    
     password: { 
         type: String, 
         required: true 

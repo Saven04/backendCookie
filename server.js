@@ -17,6 +17,7 @@ const newsRoutes = require("./routes/newsRoutes");
 const consentRoutes = require("./routes/consentRoutes");
 const User = require("./models/user");
 const mfaRoutes = require("./routes/mfaRoutes");
+const userRoutes = require("./routes/userRoutes");
 const supabase = require("./config/supabaseClient");
 const { verifyMfa } = require("./utils/mfa");
 
@@ -102,6 +103,7 @@ app.use("/api", authRoutes);
 app.use("/api/news", newsRoutes);
 app.use("/api/consent", consentRoutes);
 app.use("/api/mfa", mfaRoutes);
+app.use(userRoutes);
 
 // ✅ Get Client IP & Geolocation Data (Privacy-Aware)
 app.get("/api/get-ipinfo", async (req, res) => {

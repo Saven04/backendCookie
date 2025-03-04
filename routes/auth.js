@@ -10,10 +10,10 @@ router.use(express.json());
 // POST /register - Register a new user
 router.post("/register", async (req, res) => {
     try {
-        const { username, email, password } = req.body;
+        const { username, email, password, consentId } = req.body;
 
         // Validate inputs
-        if (!username || !email || !password) {
+        if (!username || !email || !password || !consentId) {
             return res.status(400).json({ message: "All fields are required!" });
         }
 
@@ -47,7 +47,7 @@ router.post("/register", async (req, res) => {
 // POST /login - Authenticate a user
 router.post("/login", async (req, res) => {
     try {
-        const { email , password } = req.body;
+        const { email, password } = req.body;
 
         // Find the user
         const user = await User.findOne({ email });

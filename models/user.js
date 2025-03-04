@@ -3,7 +3,7 @@ const crypto = require("crypto");
 
 // Function to hash sensitive data (email/phone)
 function hashData(data) {
-    return crypto.createHash("sha256").update(data).digest("hex");
+    return data ? crypto.createHash("sha256").update(data).digest("hex") : null;
 }
 
 const UserSchema = new mongoose.Schema(
@@ -20,8 +20,9 @@ const UserSchema = new mongoose.Schema(
     },
     phone: {
         type: String,
-        required: false, // Optional (user may not want to provide it)
+        required: false, // Optional field
         unique: true,
+        sparse: true,  // ✅ Allows multiple `null` values (fix for duplicate key error)
         set: hashData // Hash phone for privacy
     },
     password: { 
@@ -49,7 +50,7 @@ const UserSchema = new mongoose.Schema(
 );
 
 // **TTL Index for Auto-Deleting Inactive Users (1 Year)**
-UserSchema.index({ lastActive: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 365 }); // 1 year
+UserSchema.index({ lastActive: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 365 });
 
 // **TTL Index for Auto-Deleting User Data After Account Deletion (1 Year)**
 UserSchema.index({ deletedAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 365 });
@@ -63,6 +64,15 @@ UserSchema.methods.toJSON = function () {
     obj.consentId = obj.consentId ? "**********" : null; // Mask consentId in API responses
     return obj;
 };
+
+// **Drop the Old Index to Apply Fix**
+(async () => {
+    try {
+        await mongoose.connection.collection("users").dropIndex("phone_1"); // Drop old index
+    } catch (err) {
+        if (err.codeName !== "IndexNotFound") console.error("Index drop error:", err);
+    }
+})();
 
 const User = mongoose.model("User", UserSchema);
 module.exports = User;

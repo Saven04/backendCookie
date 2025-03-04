@@ -1,6 +1,6 @@
 const express = require("express");
-const CookiePreferences = require("../models/cookiePreferenceModel");
-const Location = require("../models/locationDataModel");
+const CookiePreferences = require("../models/cookiePreference");
+const Location = require("../models/locationData");
 
 const router = express.Router();
 

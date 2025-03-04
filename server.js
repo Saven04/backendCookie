@@ -3,48 +3,46 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const bodyParser = require("body-parser");
-const requestIp = require("request-ip");
+const requestIp = require("request-ip"); // ✅ Get real client IP
 const axios = require("axios");
-const session = require("express-session");
-
+const session = require("express-session"); // Add session support
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
-const { getNextSequence } = require("./utils/counterHelper");
-const Consent = require("./models/cookiePreference");
-
 const app = express();
-app.use(express.json());
 
-// ✅ CORS Configuration
+
+
+app.use(express.json());
+// CORS Configuration
 const allowedOrigins = ["https://t10hits.netlify.app"];
 app.use(
   cors({
     origin: allowedOrigins,
     credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization"], // Allow credentials headers
     methods: ["GET", "POST", "PUT", "DELETE"],
   })
 );
 
-// ✅ Middleware
+// Middleware
 app.use(bodyParser.json());
-app.use(requestIp.mw()); // Capture client IP
+app.use(requestIp.mw()); // ✅ Middleware to capture client IP
 
-// ✅ Session Configuration
+// Session Configuration
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || "fallback_secret",
+    secret: process.env.SESSION_SECRET, // Use a strong secret key
     resave: false,
-    saveUninitialized: false,
+    saveUninitialized: true,
     cookie: {
-      secure: process.env.NODE_ENV === "production",
+      secure: process.env.NODE_ENV === "production", // Use `secure` cookies in production (HTTPS)
       httpOnly: true,
       sameSite: "strict",
     },
   })
 );
 
-// ✅ Connect to MongoDB with Retry Mechanism
+// Connect to MongoDB
 const connectDB = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI, {
@@ -55,64 +53,35 @@ const connectDB = async () => {
     console.log("✅ Connected to MongoDB successfully");
   } catch (err) {
     console.error("❌ MongoDB connection error:", err);
-    setTimeout(connectDB, 5000); // Retry after 5 seconds
+    process.exit(1);
   }
 };
 connectDB();
 
-// ✅ Routes
-app.use("/api", cookieRoutes);
-app.use("/api", authRoutes);
+// Routes
+app.use("/api", cookieRoutes); // Cookie-related routes
+app.use("/api", authRoutes); 
 
-// ✅ Generate Consent ID (Ensuring Uniqueness)
-app.post("/api/generate-consent-id", async (req, res) => {
-  try {
-    const { userId } = req.body; // Assuming userId is sent in request
-
-    if (!userId) return res.status(400).json({ error: "User ID is required." });
-
-    // Expire any existing consent for the user
-    await Consent.updateMany({ user_id: userId, status: "active" }, { $set: { status: "expired" } });
-
-    // Generate a new Consent ID
-    const consentId = `CID-${await getNextSequence("consentId")}`;
-
-    // Create new consent record
-    const newConsent = new Consent({
-      consent_id: consentId,
-      user_id: userId,
-      preferences: {},
-      status: "active",
-      created_at: new Date(),
-    });
-
-    await newConsent.save();
-    res.json({ consentId });
-  } catch (error) {
-    console.error("❌ Error generating consentId:", error);
-    res.status(500).json({ error: "Failed to generate consentId" });
-  }
-});
-
-// ✅ Get Client IP & Geolocation
+// ✅ Route to get the real client IP and fetch geolocation data from `ip-api.com`
 app.get("/api/get-ipinfo", async (req, res) => {
   try {
     let clientIp = requestIp.getClientIp(req) || "Unknown";
+
     if (clientIp.includes("::ffff:")) {
       clientIp = clientIp.split("::ffff:")[1];
     }
 
     console.log("📌 Detected Client IP:", clientIp);
 
-    const response = await axios.get(`https://ipinfo.io/${clientIp}/json?token=10772b28291307`);
-    const { city, region, country, org } = response.data;
+    // Fetch geolocation data from `ip-api.com`
+    const response = await axios.get(`http://ip-api.com/json/${clientIp}`);
 
     res.json({
       ip: clientIp,
-      city: city || "Unknown",
-      region: region || "Unknown",
-      country: country || "Unknown",
-      isp: org || "Unknown",
+      city: response.data.city || "Unknown",
+      region: response.data.regionName || "Unknown",
+      country: response.data.country || "Unknown",
+      isp: response.data.isp || "Unknown",
     });
   } catch (error) {
     console.error("❌ Error fetching IP info:", error.message);
@@ -120,17 +89,45 @@ app.get("/api/get-ipinfo", async (req, res) => {
   }
 });
 
-// ✅ Health Check Route
-app.get("/", (req, res) => {
-  res.status(200).json({ message: "✅ Server is running and healthy." });
+
+app.post("/api/login", async (req, res) => {
+  try {
+      console.log("Received login request:", req.body); // Debug log
+
+      const { email, password } = req.body;
+      if (!email || !password) {
+          return res.status(400).json({ message: "Email and password are required" });
+      }
+
+      const user = await User.findOne({ email });
+      if (!user) {
+          return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+          return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      const token = jwt.sign({ id: user._id }, "secret_key", { expiresIn: "1h" });
+      return res.json({ token, user });
+  } catch (error) {
+      console.error("Login error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+  }
 });
 
-// ✅ 404 Handler
-app.use((req, res) => {
+// Health check route
+app.get("/", (req, res) => {
+  res.status(200).json({ message: "✅ Server is running on Render and healthy." });
+});
+
+// 404 Handler
+app.use((req, res, next) => {
   res.status(404).json({ message: "❌ Route not found." });
 });
 
-// ✅ Start the Server
+// Start the server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);

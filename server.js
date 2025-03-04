@@ -17,7 +17,6 @@ const newsRoutes = require("./routes/newsRoutes");
 const consentRoutes = require("./routes/consentRoutes");
 const User = require("./models/user");
 const mfaRoutes = require("./routes/mfaRoutes");
-const userRoutes = require("./routes/userRoutes");
 const supabase = require("./config/supabaseClient");
 const { verifyMfa } = require("./utils/mfa");
 
@@ -97,13 +96,35 @@ const connectDB = async () => {
 };
 connectDB();
 
+
+
+app.get("/api/get-consent-id", async (req, res) => {
+  try {
+      const token = req.headers.authorization?.split(" ")[1];
+      if (!token) return res.status(401).json({ error: "Unauthorized" });
+
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const user = await User.findOne({ email: decoded.email });
+
+      if (!user || !user.consentId) {
+          return res.status(404).json({ error: "Consent ID not found" });
+      }
+
+      res.json({ consentId: user.consentId });
+  } catch (error) {
+      console.error("Error fetching Consent ID:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+
 // ✅ Routes
 app.use("/api", cookieRoutes);
 app.use("/api", authRoutes);
 app.use("/api/news", newsRoutes);
 app.use("/api/consent", consentRoutes);
 app.use("/api/mfa", mfaRoutes);
-app.use("/api", userRoutes);  
+
 
 // ✅ Get Client IP & Geolocation Data (Privacy-Aware)
 app.get("/api/get-ipinfo", async (req, res) => {

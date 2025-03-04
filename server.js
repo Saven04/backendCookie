@@ -8,6 +8,7 @@ const axios = require("axios");
 const session = require("express-session"); // Add session support
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
+const newsRoutes = require("./routes/newsRoutes");
 const app = express();
 
 
@@ -61,6 +62,7 @@ connectDB();
 // Routes
 app.use("/api", cookieRoutes); // Cookie-related routes
 app.use("/api", authRoutes); 
+app.use("/api/news", newsRoutes);
 
 // ✅ Route to get the real client IP and fetch geolocation data from `ip-api.com`
 app.get("/api/get-ipinfo", async (req, res) => {
@@ -116,6 +118,9 @@ app.post("/api/login", async (req, res) => {
       return res.status(500).json({ message: "Internal server error" });
   }
 });
+
+
+
 
 // Health check route
 app.get("/", (req, res) => {

@@ -3,7 +3,7 @@ const { saveCookiePreferences } = require("../controllers/consentController");
 const { saveLocationData, deleteLocationData } = require("../controllers/locationController");
 const crypto = require("crypto");
 const Consent = require("../models/consent");
-const authenticateToken = require("../middleware/authenticateToken");
+const authenticateToken = require("../middleware/authenticateToken.js");
 
 const router = express.Router();
 router.use(express.json()); // Middleware to parse JSON

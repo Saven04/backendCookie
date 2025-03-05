@@ -11,7 +11,7 @@ const jwt = require("jsonwebtoken");
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
 const newsRoutes = require("./routes/newsRoutes");
-
+const Consent = require("./models/consent"); 
 
 const app = express();
 

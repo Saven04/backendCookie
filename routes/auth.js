@@ -11,11 +11,36 @@ router.use(express.json());
 // POST /register - Register a new user
 router.post("/register", async (req, res) => {
     try {
-        const { username, email, password, consentId, preferences } = req.body;
+        const { username, email, password, preferences } = req.body;
 
         // Validate inputs
-        if (!username || !email || !password || !consentId || !preferences) {
+        if (!username || !email || !password || !preferences) {
             return res.status(400).json({ message: "All fields are required!" });
+        }
+
+        // Check if preferences object contains valid keys
+        const validPreferences = [
+            "strictlyNecessary",
+            "performance",
+            "functional",
+            "advertising",
+            "socialMedia",
+        ];
+
+        for (const key of Object.keys(preferences)) {
+            if (!validPreferences.includes(key)) {
+                return res.status(400).json({ message: `Invalid preference key: ${key}` });
+            }
+        }
+
+        // Ensure all required preferences are provided
+        const missingPreferences = validPreferences.filter(
+            (key) => preferences[key] === undefined
+        );
+        if (missingPreferences.length > 0) {
+            return res.status(400).json({
+                message: `Missing preferences: ${missingPreferences.join(", ")}`,
+            });
         }
 
         // Check if user already exists
@@ -39,7 +64,6 @@ router.post("/register", async (req, res) => {
 
         // Save consent preferences in the Consents collection
         const newConsent = new Consent({
-            consentId,
             userId: newUser._id, // Link to the user's _id
             preferences, // Store cookie preferences
         });
@@ -48,7 +72,7 @@ router.post("/register", async (req, res) => {
 
         res.status(201).json({ message: "User registered successfully!" });
     } catch (error) {
-        console.error("Error:", error);
+        console.error("❌ Error during registration:", error.message);
         res.status(500).json({ message: "Server error. Please try again later." });
     }
 });

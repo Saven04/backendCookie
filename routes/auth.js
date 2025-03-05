@@ -10,14 +10,13 @@ router.use(express.json());
 
 // POST /register - Register a new user
 // POST /register - Register a new user
-// POST /register - Register a new user
 router.post("/register", async (req, res) => {
     try {
         const { username, email, password, preferences } = req.body;
 
         // Validate inputs
-        if (!username || !email || !password) {
-            return res.status(400).json({ message: "Username, email, and password are required!" });
+        if (!username || !email || !password || !preferences) {
+            return res.status(400).json({ message: "All fields are required!" });
         }
 
         // Check if user already exists
@@ -30,7 +29,7 @@ router.post("/register", async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Create new user
+        // Create new user (consentId is auto-generated)
         const newUser = new User({
             username,
             email,
@@ -39,19 +38,11 @@ router.post("/register", async (req, res) => {
 
         await newUser.save();
 
-        // Save default consent preferences if none are provided
-        const defaultPreferences = preferences || {
-            strictlyNecessary: true,
-            performance: false,
-            functional: false,
-            advertising: false,
-            socialMedia: false,
-        };
-
         // Save consent preferences in the Consents collection
         const newConsent = new Consent({
+            consentId: newUser.consentId, // Use the auto-generated consentId
             userId: newUser._id, // Link to the user's _id
-            preferences: defaultPreferences, // Use provided preferences or defaults
+            preferences, // Store cookie preferences
         });
 
         await newConsent.save();
@@ -97,6 +88,20 @@ router.post("/login", async (req, res) => {
         res.status(500).json({ message: "Internal server error." });
     }
 });
+
+// GET /check-auth - Check if the user is authenticated
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers["authorization"];
+    const token = authHeader && authHeader.split(" ")[1];
+    if (!token) return res.status(401).json({ message: "Access denied. No token provided." });
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+        if (err) return res.status(403).json({ message: "Invalid or expired token." });
+        req.user = user; // Attach the user object to the request
+        next();
+    });
+}
+
 
 // GET /check-auth - Check if the user is authenticated
 router.get("/check-auth", authenticateToken, (req, res) => {

@@ -17,30 +17,58 @@ const generateShortId = () => {
 // 👉 **POST Route to Save Cookie Preferences**
 router.post("/save", async (req, res) => {
   try {
-    const { userId, preferences, locationData, consentId } = req.body;
+      const { userId, consentId, preferences } = req.body;
 
-    // Validate input
-    if (!preferences) {
-      return res.status(400).json({ message: "Preferences are required." });
-    }
+      // Validate inputs
+      if (!preferences || typeof preferences !== "object") {
+          return res.status(400).json({ message: "Preferences are required." });
+      }
 
-    // If no userId is provided, use consentId for unauthenticated users
-    const newConsent = new Consent({
-      userId: userId || null, // Link to user if authenticated
-      consentId: consentId || generateShortId(), // Generate a new consentId if not provided
-      preferences,
-      locationData: locationData || {}, // Optional location data
-    });
+      // If userId is provided, link preferences to the user
+      if (userId) {
+          let consent = await Consent.findOne({ userId });
 
-    await newConsent.save();
+          if (consent) {
+              // Update existing preferences
+              consent.preferences = preferences;
+              consent.updatedAt = new Date();
+          } else {
+              // Create a new consent document for the user
+              consent = new Consent({
+                  userId,
+                  preferences,
+              });
+          }
 
-    res.status(201).json({
-      message: "Preferences and location data saved successfully.",
-      consentId: newConsent.consentId, // Return the consentId for reference
-    });
+          await consent.save();
+          return res.status(200).json({ message: "Preferences saved successfully." });
+      }
+
+      // If consentId is provided, link preferences to the consentId
+      if (consentId) {
+          let consent = await Consent.findOne({ consentId });
+
+          if (consent) {
+              // Update existing preferences
+              consent.preferences = preferences;
+              consent.updatedAt = new Date();
+          } else {
+              // Create a new consent document for the consentId
+              consent = new Consent({
+                  consentId,
+                  preferences,
+              });
+          }
+
+          await consent.save();
+          return res.status(200).json({ message: "Preferences saved successfully." });
+      }
+
+      // If neither userId nor consentId is provided
+      return res.status(400).json({ message: "Either userId or consentId is required." });
   } catch (error) {
-    console.error("Error saving preferences:", error);
-    res.status(500).json({ message: "Internal server error." });
+      console.error("❌ Error saving preferences:", error.message);
+      res.status(500).json({ message: "Internal server error." });
   }
 });
 

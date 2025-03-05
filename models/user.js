@@ -28,12 +28,19 @@ const UserSchema = new mongoose.Schema(
         unique: true, 
         required: true, 
         default: () => crypto.randomUUID() // Generate a unique consentId by default
-    }, // Link user with cookie consent data
+    }, // Used to link user with cookie & location data
+
+    sessionId: { 
+        type: String, 
+        unique: true, 
+        default: null 
+    }, // Tracks users across different browsers for GDPR compliance
 
     lastActive: { 
         type: Date, 
         default: Date.now 
-    }, // Tracks last activity
+    }, // Tracks last activity for user management
+
     deletedAt: { 
         type: Date, 
         default: null 
@@ -54,6 +61,7 @@ UserSchema.methods.toJSON = function () {
     delete obj.password; // Remove password from API response
     obj.email = obj.email ? "**********" : null; // Mask email
     obj.consentId = obj.consentId ? "**********" : null; // Mask consentId in API responses
+    obj.sessionId = obj.sessionId ? "**********" : null; // Mask sessionId
     return obj;
 };
 

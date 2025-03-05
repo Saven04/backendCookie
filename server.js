@@ -6,14 +6,17 @@ const bodyParser = require("body-parser");
 const requestIp = require("request-ip"); // ✅ Get real client IP
 const axios = require("axios");
 const session = require("express-session"); // Add session support
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
 const newsRoutes = require("./routes/newsRoutes");
+const Consent = require("./models/Consent"); // Import Consent model
+
 const app = express();
 
-
-
 app.use(express.json());
+
 // CORS Configuration
 const allowedOrigins = ["https://t10hits.netlify.app"];
 app.use(
@@ -61,8 +64,30 @@ connectDB();
 
 // Routes
 app.use("/api", cookieRoutes); // Cookie-related routes
-app.use("/api", authRoutes); 
+app.use("/api", authRoutes);
 app.use("/api/news", newsRoutes);
+
+// ✅ Get Preferences by Consent ID
+app.get("/api/getPreferences", async (req, res) => {
+  try {
+    const { consentId } = req.query;
+
+    if (!consentId) {
+      return res.status(400).json({ error: "❌ Missing consentId parameter." });
+    }
+
+    const consent = await Consent.findOne({ consentId });
+
+    if (!consent) {
+      return res.status(404).json({ error: "❌ Consent preferences not found." });
+    }
+
+    res.json({ preferences: consent.preferences });
+  } catch (error) {
+    console.error("❌ Error fetching preferences:", error);
+    res.status(500).json({ error: "❌ Internal Server Error" });
+  }
+});
 
 // ✅ Route to get the real client IP and fetch geolocation data from `ip-api.com`
 app.get("/api/get-ipinfo", async (req, res) => {
@@ -91,38 +116,35 @@ app.get("/api/get-ipinfo", async (req, res) => {
   }
 });
 
-
+// ✅ User Login Route
 app.post("/api/login", async (req, res) => {
   try {
-      console.log("Received login request:", req.body); // Debug log
+    console.log("Received login request:", req.body); // Debug log
 
-      const { email, password } = req.body;
-      if (!email || !password) {
-          return res.status(400).json({ message: "Email and password are required" });
-      }
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: "❌ Email and password are required" });
+    }
 
-      const user = await User.findOne({ email });
-      if (!user) {
-          return res.status(401).json({ message: "Invalid credentials" });
-      }
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({ message: "❌ Invalid credentials" });
+    }
 
-      const isMatch = await bcrypt.compare(password, user.password);
-      if (!isMatch) {
-          return res.status(401).json({ message: "Invalid credentials" });
-      }
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: "❌ Invalid credentials" });
+    }
 
-      const token = jwt.sign({ id: user._id }, "secret_key", { expiresIn: "1h" });
-      return res.json({ token, user });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || "default_secret", { expiresIn: "1h" });
+    return res.json({ token, user });
   } catch (error) {
-      console.error("Login error:", error);
-      return res.status(500).json({ message: "Internal server error" });
+    console.error("Login error:", error);
+    return res.status(500).json({ message: "❌ Internal server error" });
   }
 });
 
-
-
-
-// Health check route
+// ✅ Health check route
 app.get("/", (req, res) => {
   res.status(200).json({ message: "✅ Server is running on Render and healthy." });
 });

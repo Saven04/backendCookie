@@ -3,19 +3,21 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const bodyParser = require("body-parser");
-const requestIp = require("request-ip"); // ✅ Get real client IP
-const axios = require("axios");
+const requestIp = require("request-ip"); // ✅ Middleware to capture client IP
 const session = require("express-session"); // Add session support
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const cookieRoutes = require("./routes/cookieRoutes");
+
+// Import Routes
+const cookieRoutes = require("./routes/consentRoutes");
 const authRoutes = require("./routes/auth");
 const newsRoutes = require("./routes/newsRoutes");
-
+const locationRoutes = require("./routes/locationRoutes");
 
 const app = express();
 
+// Middleware
 app.use(express.json());
+app.use(bodyParser.json());
+app.use(requestIp.mw()); // ✅ Middleware to capture client IP
 
 // CORS Configuration
 const allowedOrigins = ["https://t10hits.netlify.app"];
@@ -28,14 +30,10 @@ app.use(
   })
 );
 
-// Middleware
-app.use(bodyParser.json());
-app.use(requestIp.mw()); // ✅ Middleware to capture client IP
-
 // Session Configuration
 app.use(
   session({
-    secret: process.env.SESSION_SECRET, // Use a strong secret key
+    secret: process.env.SESSION_SECRET || "default_secret", // Use a strong secret key
     resave: false,
     saveUninitialized: true,
     cookie: {
@@ -64,50 +62,11 @@ connectDB();
 
 // Routes
 app.use("/api", cookieRoutes); // Cookie-related routes
-app.use("/api", authRoutes);
-app.use("/api/news", newsRoutes);
+app.use("/api", authRoutes); // Authentication routes
+app.use("/api/news", newsRoutes); // News-related routes
+app.use("/api", locationRoutes); // Location-related routes
 
-// ✅ Get Preferences by Consent ID
-app.get("/api/get-ipinfo", async (req, res) => {
-  try {
-    let clientIp = requestIp.getClientIp(req) || "Unknown";
-
-    // Handle IPv6-mapped IPv4 addresses
-    if (clientIp.includes("::ffff:")) {
-      clientIp = clientIp.split("::ffff:")[1];
-    }
-
-    console.log("📌 Detected Client IP:", clientIp);
-
-    // Fetch geolocation data from `ipinfo.io`
-    const response = await axios.get(`https://ipinfo.io/${clientIp}/json?token=${process.env.IPINFO_TOKEN}`);
-
-    // Extract relevant data from the response
-    const { city, region, country, org, loc } = response.data;
-
-    // Parse latitude and longitude from the `loc` field
-    const [latitude, longitude] = loc ? loc.split(",").map(Number) : [null, null];
-
-    res.json({
-      ip: clientIp,
-      city: city || "Unknown",
-      region: region || "Unknown",
-      country: country || "Unknown",
-      isp: org || "Unknown",
-      latitude: latitude || null,
-      longitude: longitude || null,
-    });
-  } catch (error) {
-    console.error("❌ Error fetching IP info:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
-
-// ✅ Route to get the real client IP and fetch geolocation data from `ip-api.com`
-
-
-
-// ✅ Health check route
+// ✅ Health Check Route
 app.get("/", (req, res) => {
   res.status(200).json({ message: "✅ Server is running on Render and healthy." });
 });
@@ -117,7 +76,7 @@ app.use((req, res, next) => {
   res.status(404).json({ message: "❌ Route not found." });
 });
 
-// Start the server
+// Start the Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);

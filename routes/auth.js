@@ -1,6 +1,7 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
-const User = require("../models/user"); 
+const User = require("../models/user");
+const Consent = require("../models/consent");
 const jwt = require("jsonwebtoken");
 const router = express.Router();
 
@@ -8,12 +9,13 @@ const router = express.Router();
 router.use(express.json());
 
 // POST /register - Register a new user
+// POST /register - Register a new user
 router.post("/register", async (req, res) => {
     try {
-        const { username, email, password, consentId } = req.body;
+        const { username, email, password, preferences } = req.body;
 
         // Validate inputs
-        if (!username || !email || !password || !consentId) {
+        if (!username || !email || !password || !preferences) {
             return res.status(400).json({ message: "All fields are required!" });
         }
 
@@ -27,15 +29,23 @@ router.post("/register", async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Create new user and link the consentId
+        // Create new user (consentId is auto-generated)
         const newUser = new User({
             username,
             email,
             password: hashedPassword,
-            consentId, // Link the short consentId provided by the frontend
         });
 
         await newUser.save();
+
+        // Save consent preferences in the Consents collection
+        const newConsent = new Consent({
+            consentId: newUser.consentId, // Use the auto-generated consentId
+            userId: newUser._id, // Link to the user's _id
+            preferences, // Store cookie preferences
+        });
+
+        await newConsent.save();
 
         res.status(201).json({ message: "User registered successfully!" });
     } catch (error) {
@@ -72,20 +82,44 @@ router.post("/login", async (req, res) => {
 });
 
 // GET /check-auth - Check if the user is authenticated
-
-// Middleware to check authentication status
-router.get("/check-auth", (req, res) => {
+router.get("/check-auth", authenticateToken, (req, res) => {
     try {
-        // Check if the session contains a userId
-        if (req.session && req.session.userId) {
-            return res.status(200).json({ authenticated: true });
-        } else {
-            return res.status(200).json({ authenticated: false });
-        }
+        // If the middleware passes, the user is authenticated
+        res.status(200).json({ authenticated: true });
     } catch (error) {
         console.error("❌ Error in /check-auth:", error);
-        return res.status(500).json({ error: "Internal Server Error" });
+        res.status(500).json({ error: "Internal Server Error" });
     }
 });
+
+// DELETE /delete-data - Delete user data
+router.delete("/delete-data", authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.userId;
+
+        // Mark the user for deletion
+        await User.findByIdAndUpdate(userId, { deletedAt: new Date() });
+
+        // Delete user's consent preferences from the Consents collection
+        await Consent.deleteMany({ userId });
+
+        res.status(200).json({ message: "Your data has been marked for deletion as per GDPR." });
+    } catch (error) {
+        console.error("Error:", error);
+        res.status(500).json({ message: "Server error. Please try again later." });
+    }
+});
+// Middleware to authenticate JWT token
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers["authorization"];
+    const token = authHeader && authHeader.split(" ")[1];
+    if (!token) return res.status(401).json({ message: "Access denied. No token provided." });
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+        if (err) return res.status(403).json({ message: "Invalid or expired token." });
+        req.user = user; // Attach the user object to the request
+        next();
+    });
+}
 
 module.exports = router;

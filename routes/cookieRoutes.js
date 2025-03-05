@@ -1,6 +1,6 @@
 const express = require("express");
-const { saveCookiePreferences, deleteCookiePreferences } = require("../controllers/cookieController");
-const { saveLocationData, deleteLocationData } = require("../controllers/locationController");
+const { saveCookiePreferences } = require("../controllers/cookieController");
+const { saveLocationData } = require("../controllers/locationController");
 const crypto = require("crypto");
 
 const router = express.Router();
@@ -8,7 +8,6 @@ router.use(express.json()); // Middleware to parse JSON
 
 // Generate a short consent ID (only if necessary)
 const generateShortId = () => {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     const bytes = crypto.randomBytes(6);
     return bytes.toString("base64")
                 .replace(/[+/=]/g, "") 

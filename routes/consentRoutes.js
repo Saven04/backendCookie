@@ -17,60 +17,45 @@ const generateShortId = () => {
 // 👉 **POST Route to Save Cookie Preferences**
 router.post("/save", async (req, res) => {
   try {
-      const { userId, consentId, preferences } = req.body;
+      const { userId, preferences } = req.body;
 
       // Validate inputs
       if (!preferences || typeof preferences !== "object") {
           return res.status(400).json({ message: "Preferences are required." });
       }
 
-      // If userId is provided, link preferences to the user
+      let consent;
       if (userId) {
-          let consent = await Consent.findOne({ userId });
+          // Find the user's consentId
+          const user = await User.findById(userId);
+          if (!user) {
+              return res.status(404).json({ message: "User not found." });
+          }
 
-          if (consent) {
-              // Update existing preferences
-              consent.preferences = preferences;
-              consent.updatedAt = new Date();
-          } else {
-              // Create a new consent document for the user
+          // Find or create the consent document using the user's consentId
+          consent = await Consent.findOne({ consentId: user.consentId });
+          if (!consent) {
               consent = new Consent({
                   userId,
+                  consentId: user.consentId,
                   preferences,
               });
-          }
-
-          await consent.save();
-          return res.status(200).json({ message: "Preferences saved successfully." });
-      }
-
-      // If consentId is provided, link preferences to the consentId
-      if (consentId) {
-          let consent = await Consent.findOne({ consentId });
-
-          if (consent) {
-              // Update existing preferences
+          } else {
               consent.preferences = preferences;
               consent.updatedAt = new Date();
-          } else {
-              // Create a new consent document for the consentId
-              consent = new Consent({
-                  consentId,
-                  preferences,
-              });
           }
-
-          await consent.save();
-          return res.status(200).json({ message: "Preferences saved successfully." });
+      } else {
+          return res.status(400).json({ message: "userId is required." });
       }
 
-      // If neither userId nor consentId is provided
-      return res.status(400).json({ message: "Either userId or consentId is required." });
+      await consent.save();
+      res.status(200).json({ message: "Preferences saved successfully." });
   } catch (error) {
       console.error("❌ Error saving preferences:", error.message);
       res.status(500).json({ message: "Internal server error." });
   }
 });
+
 
 // 👉 **GET Route to Fetch Preferences by userId or consentId**
 router.get("/get-preferences", async (req, res) => {

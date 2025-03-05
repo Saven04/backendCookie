@@ -5,6 +5,7 @@ const userSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     sessionId: { type: String, unique: true, sparse: true }, // Unique session ID
+    consentId: { type: String, unique: true, sparse: true }, // Unique consent ID
 });
 
 module.exports = mongoose.model("User", userSchema);

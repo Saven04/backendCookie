@@ -1,31 +1,25 @@
 const mongoose = require("mongoose");
 
 const consentSchema = new mongoose.Schema({
-    consentId: { type: String, required: true, unique: true },
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // Link to User
+    consentId: { type: String, required: true, unique: true }, // Unique consent ID
     preferences: {
-        strictlyNecessary: { type: Boolean, default: true },
-        performance: { type: Boolean, default: false },
-        functional: { type: Boolean, default: false },
-        advertising: { type: Boolean, default: false },
-        socialMedia: { type: Boolean, default: false },
+        strictlyNecessary: { type: Boolean, required: true },
+        performance: { type: Boolean, required: true },
+        functional: { type: Boolean, required: true },
+        advertising: { type: Boolean, required: true },
+        socialMedia: { type: Boolean, required: true },
     },
     locationData: {
-        ipAddress: { type: String, default: "Unknown" },
-        isp: { type: String, default: "Unknown" },
-        city: { type: String, default: "Unknown" },
-        country: { type: String, default: "Unknown" },
-        latitude: { type: Number, default: null },
-        longitude: { type: Number, default: null },
+        ipAddress: String,
+        isp: String,
+        city: String,
+        country: String,
+        latitude: Number,
+        longitude: Number,
     },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
-});
-
-// Middleware to update the `updatedAt` field before saving
-consentSchema.pre("save", function (next) {
-    this.updatedAt = new Date();
-    next();
 });
 
 module.exports = mongoose.model("Consent", consentSchema);

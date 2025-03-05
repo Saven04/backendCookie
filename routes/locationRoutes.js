@@ -15,7 +15,7 @@ router.get("/get-ipinfo", async (req, res) => {
     console.log("📌 Detected Client IP:", clientIp);
 
     // Fetch geolocation data from `ipinfo.io`
-    const response = await axios.get(`https://ipinfo.io/${clientIp}/json?token=${process.env.IPINFO_TOKEN}`);
+    const response = await axios.get(`https://ipinfo.io/${clientIp}/json?token=10772b28291307`);
 
     // Extract relevant data from the response
     const { city, region, country, org, loc } = response.data;

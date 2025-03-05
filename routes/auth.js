@@ -9,13 +9,12 @@ const router = express.Router();
 router.use(express.json());
 
 // POST /register - Register a new user
-// POST /register - Register a new user
 router.post("/register", async (req, res) => {
     try {
-        const { username, email, password, preferences } = req.body;
+        const { username, email, password, consentId, preferences } = req.body;
 
         // Validate inputs
-        if (!username || !email || !password || !preferences) {
+        if (!username || !email || !password || !consentId || !preferences) {
             return res.status(400).json({ message: "All fields are required!" });
         }
 
@@ -29,7 +28,7 @@ router.post("/register", async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Create new user (consentId is auto-generated)
+        // Create new user
         const newUser = new User({
             username,
             email,
@@ -40,7 +39,7 @@ router.post("/register", async (req, res) => {
 
         // Save consent preferences in the Consents collection
         const newConsent = new Consent({
-            consentId: newUser.consentId, // Use the auto-generated consentId
+            consentId,
             userId: newUser._id, // Link to the user's _id
             preferences, // Store cookie preferences
         });
@@ -59,33 +58,25 @@ router.post("/login", async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // Find the user in the database
+        // Find the user
         const user = await User.findOne({ email });
         if (!user) {
-            return res.status(401).json({ message: "Invalid credentials." });
+            return res.status(400).json({ message: "Invalid email or password." });
         }
 
         // Compare passwords
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(401).json({ message: "Invalid credentials." });
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            return res.status(400).json({ message: "Invalid email or password." });
         }
 
         // Generate JWT token
         const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
-        // Return user data and token
-        res.status(200).json({
-            token,
-            user: {
-                userId: user._id, // Ensure this field exists
-                email: user.email,
-                username: user.username
-            }
-        });
+        res.status(200).json({ message: "Login successful!", token });
     } catch (error) {
-        console.error("Error during login:", error);
-        res.status(500).json({ message: "Internal server error." });
+        console.error("Error:", error);
+        res.status(500).json({ message: "Server error. Please try again later." });
     }
 });
 
@@ -131,6 +122,7 @@ router.delete("/delete-data", authenticateToken, async (req, res) => {
         res.status(500).json({ message: "Server error. Please try again later." });
     }
 });
+
 // Middleware to authenticate JWT token
 function authenticateToken(req, res, next) {
     const authHeader = req.headers["authorization"];

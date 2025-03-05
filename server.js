@@ -104,33 +104,7 @@ app.get("/api/get-ipinfo", async (req, res) => {
 });
 
 // ✅ Route to get the real client IP and fetch geolocation data from `ip-api.com`
-app.get("/api/get-ipinfo", async (req, res) => {
-  try {
-    let clientIp = requestIp.getClientIp(req) || "Unknown";
 
-    if (clientIp.includes("::ffff:")) {
-      clientIp = clientIp.split("::ffff:")[1];
-    }
-
-    console.log("📌 Detected Client IP:", clientIp);
-
-    // Fetch geolocation data from `ip-api.com`
-    const response = await axios.get(`http://ip-api.com/json/${clientIp}`);
-
-    res.json({
-      ip: clientIp,
-      city: response.data.city || "Unknown",
-      region: response.data.regionName || "Unknown",
-      country: response.data.country || "Unknown",
-      isp: response.data.isp || "Unknown",
-    });
-  } catch (error) {
-    console.error("❌ Error fetching IP info:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
-
-// ✅ User Login Route
 
 
 // ✅ Health check route

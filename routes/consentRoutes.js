@@ -63,8 +63,8 @@ router.get("/get-preferences", async (req, res) => {
       const { userId } = req.query;
 
       // Validate userId
-      if (!userId) {
-          return res.status(400).json({ message: "userId is required." });
+      if (!userId || userId === "null") {
+          return res.status(400).json({ message: "Invalid or missing userId." });
       }
 
       // Find preferences in the Consents collection

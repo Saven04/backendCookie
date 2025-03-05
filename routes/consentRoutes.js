@@ -47,30 +47,27 @@ router.post("/save", async (req, res) => {
 // 👉 **GET Route to Fetch Preferences by userId or consentId**
 router.get("/get-preferences", async (req, res) => {
   try {
-    const { userId, consentId } = req.query;
+      const { userId } = req.query;
 
-    // Validate input
-    if (!userId && !consentId) {
-      return res.status(400).json({ message: "Either userId or consentId is required." });
-    }
+      // Validate userId
+      if (!userId) {
+          return res.status(400).json({ message: "userId is required." });
+      }
 
-    // Fetch preferences based on userId or consentId
-    const query = userId ? { userId } : { consentId };
-    const consent = await Consent.findOne(query);
+      // Find preferences in the Consents collection
+      const consent = await Consent.findOne({ userId });
 
-    if (!consent) {
-      return res.status(404).json({ message: "Preferences not found." });
-    }
+      if (!consent) {
+          return res.status(404).json({ message: "Preferences not found for this user." });
+      }
 
-    res.status(200).json({
-      preferences: consent.preferences,
-      locationData: consent.locationData,
-      createdAt: consent.createdAt,
-      updatedAt: consent.updatedAt,
-    });
+      // Return preferences
+      res.status(200).json({
+          preferences: consent.preferences,
+      });
   } catch (error) {
-    console.error("Error fetching preferences:", error);
-    res.status(500).json({ message: "Internal server error." });
+      console.error("❌ Error fetching preferences:", error.message);
+      res.status(500).json({ message: "Internal server error." });
   }
 });
 

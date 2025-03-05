@@ -94,6 +94,62 @@ router.post("/save-location", async (req, res) => {
   }
 });
 
+
+router.get("/check-session", async (req, res) => {
+  try {
+      const { sessionId } = req.query;
+
+      if (!sessionId) {
+          return res.status(400).json({ message: "Session ID is required." });
+      }
+
+      // Find the user's session
+      const user = await User.findOne({ sessionId });
+      if (!user) {
+          return res.status(404).json({ message: "Session not found." });
+      }
+
+      // Retrieve the user's preferences
+      const consent = await Consent.findOne({ sessionId });
+      if (!consent) {
+          return res.status(404).json({ message: "Consent not found." });
+      }
+
+      res.status(200).json({
+          userId: user._id,
+          preferences: consent.preferences,
+      });
+  } catch (error) {
+      console.error("❌ Error checking session:", error.message);
+      res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+
+router.delete("/delete-data", authenticateToken, async (req, res) => {
+  try {
+      const { consentId } = req.body;
+
+      if (!consentId) {
+          return res.status(400).json({ message: "Consent ID is required." });
+      }
+
+      // Find and delete the user's consent
+      const consent = await Consent.findOneAndDelete({ consentId });
+      if (!consent) {
+          return res.status(404).json({ message: "Consent not found." });
+      }
+
+      // Delete the user's account
+      await User.findOneAndDelete({ _id: consent.userId });
+
+      res.status(200).json({ message: "Your data has been deleted as per GDPR." });
+  } catch (error) {
+      console.error("❌ Error deleting data:", error.message);
+      res.status(500).json({ message: "Internal server error." });
+  }
+});
+
 // 👉 **DELETE Route to Delete Location Data**
 router.delete("/delete-location/:consentId", async (req, res) => {
   try {

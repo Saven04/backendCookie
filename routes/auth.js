@@ -9,6 +9,8 @@ const router = express.Router();
 router.use(express.json());
 
 // POST /register - Register a new user
+const { v4: uuidv4 } = require("uuid");
+
 router.post("/register", async (req, res) => {
     try {
         const { username, email, password, preferences } = req.body;
@@ -16,31 +18,6 @@ router.post("/register", async (req, res) => {
         // Validate inputs
         if (!username || !email || !password || !preferences) {
             return res.status(400).json({ message: "All fields are required!" });
-        }
-
-        // Check if preferences object contains valid keys
-        const validPreferences = [
-            "strictlyNecessary",
-            "performance",
-            "functional",
-            "advertising",
-            "socialMedia",
-        ];
-
-        for (const key of Object.keys(preferences)) {
-            if (!validPreferences.includes(key)) {
-                return res.status(400).json({ message: `Invalid preference key: ${key}` });
-            }
-        }
-
-        // Ensure all required preferences are provided
-        const missingPreferences = validPreferences.filter(
-            (key) => preferences[key] === undefined
-        );
-        if (missingPreferences.length > 0) {
-            return res.status(400).json({
-                message: `Missing preferences: ${missingPreferences.join(", ")}`,
-            });
         }
 
         // Check if user already exists
@@ -54,18 +31,25 @@ router.post("/register", async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
 
         // Create new user
+        const sessionId = uuidv4(); // Generate session ID
         const newUser = new User({
             username,
             email,
             password: hashedPassword,
+            sessionId, // Save session ID
         });
 
         await newUser.save();
 
-        // Save consent preferences in the Consents collection
+        // Generate consent ID
+        const consentId = uuidv4();
+
+        // Save consent preferences
         const newConsent = new Consent({
-            userId: newUser._id, // Link to the user's _id
-            preferences, // Store cookie preferences
+            userId: newUser._id,
+            sessionId,
+            consentId,
+            preferences,
         });
 
         await newConsent.save();
@@ -82,25 +66,33 @@ router.post("/login", async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // Find the user
+        // Find the user in the database
         const user = await User.findOne({ email });
         if (!user) {
-            return res.status(400).json({ message: "Invalid email or password." });
+            return res.status(401).json({ message: "Invalid credentials." });
         }
 
         // Compare passwords
-        const isPasswordValid = await bcrypt.compare(password, user.password);
-        if (!isPasswordValid) {
-            return res.status(400).json({ message: "Invalid email or password." });
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(401).json({ message: "Invalid credentials." });
         }
 
         // Generate JWT token
         const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
-        res.status(200).json({ message: "Login successful!", token });
+        res.status(200).json({
+            token,
+            user: {
+                userId: user._id,
+                email: user.email,
+                username: user.username,
+                sessionId: user.sessionId, // Include session ID in the response
+            },
+        });
     } catch (error) {
-        console.error("Error:", error);
-        res.status(500).json({ message: "Server error. Please try again later." });
+        console.error("❌ Error during login:", error.message);
+        res.status(500).json({ message: "Internal server error." });
     }
 });
 
@@ -147,17 +139,6 @@ router.delete("/delete-data", authenticateToken, async (req, res) => {
     }
 });
 
-// Middleware to authenticate JWT token
-function authenticateToken(req, res, next) {
-    const authHeader = req.headers["authorization"];
-    const token = authHeader && authHeader.split(" ")[1];
-    if (!token) return res.status(401).json({ message: "Access denied. No token provided." });
 
-    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-        if (err) return res.status(403).json({ message: "Invalid or expired token." });
-        req.user = user; // Attach the user object to the request
-        next();
-    });
-}
 
 module.exports = router;

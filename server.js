@@ -68,24 +68,38 @@ app.use("/api", authRoutes);
 app.use("/api/news", newsRoutes);
 
 // ✅ Get Preferences by Consent ID
-app.get("/api/getPreferences", async (req, res) => {
+app.get("/api/get-ipinfo", async (req, res) => {
   try {
-    const { consentId } = req.query;
+    let clientIp = requestIp.getClientIp(req) || "Unknown";
 
-    if (!consentId) {
-      return res.status(400).json({ error: "❌ Missing consentId parameter." });
+    // Handle IPv6-mapped IPv4 addresses
+    if (clientIp.includes("::ffff:")) {
+      clientIp = clientIp.split("::ffff:")[1];
     }
 
-    const consent = await Consent.findOne({ consentId });
+    console.log("📌 Detected Client IP:", clientIp);
 
-    if (!consent) {
-      return res.status(404).json({ error: "❌ Consent preferences not found." });
-    }
+    // Fetch geolocation data from `ipinfo.io`
+    const response = await axios.get(`https://ipinfo.io/${clientIp}/json?token=${process.env.IPINFO_TOKEN}`);
 
-    res.json({ preferences: consent.preferences });
+    // Extract relevant data from the response
+    const { city, region, country, org, loc } = response.data;
+
+    // Parse latitude and longitude from the `loc` field
+    const [latitude, longitude] = loc ? loc.split(",").map(Number) : [null, null];
+
+    res.json({
+      ip: clientIp,
+      city: city || "Unknown",
+      region: region || "Unknown",
+      country: country || "Unknown",
+      isp: org || "Unknown",
+      latitude: latitude || null,
+      longitude: longitude || null,
+    });
   } catch (error) {
-    console.error("❌ Error fetching preferences:", error);
-    res.status(500).json({ error: "❌ Internal Server Error" });
+    console.error("❌ Error fetching IP info:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
@@ -117,32 +131,7 @@ app.get("/api/get-ipinfo", async (req, res) => {
 });
 
 // ✅ User Login Route
-app.post("/api/login", async (req, res) => {
-  try {
-    console.log("Received login request:", req.body); // Debug log
 
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ message: "❌ Email and password are required" });
-    }
-
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ message: "❌ Invalid credentials" });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ message: "❌ Invalid credentials" });
-    }
-
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || "default_secret", { expiresIn: "1h" });
-    return res.json({ token, user });
-  } catch (error) {
-    console.error("Login error:", error);
-    return res.status(500).json({ message: "❌ Internal server error" });
-  }
-});
 
 // ✅ Health check route
 app.get("/", (req, res) => {

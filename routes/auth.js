@@ -10,13 +10,14 @@ router.use(express.json());
 
 // POST /register - Register a new user
 // POST /register - Register a new user
+// POST /register - Register a new user
 router.post("/register", async (req, res) => {
     try {
         const { username, email, password, preferences } = req.body;
 
         // Validate inputs
-        if (!username || !email || !password || !preferences) {
-            return res.status(400).json({ message: "All fields are required!" });
+        if (!username || !email || !password) {
+            return res.status(400).json({ message: "Username, email, and password are required!" });
         }
 
         // Check if user already exists
@@ -29,7 +30,7 @@ router.post("/register", async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Create new user (consentId is auto-generated)
+        // Create new user
         const newUser = new User({
             username,
             email,
@@ -38,11 +39,19 @@ router.post("/register", async (req, res) => {
 
         await newUser.save();
 
+        // Save default consent preferences if none are provided
+        const defaultPreferences = preferences || {
+            strictlyNecessary: true,
+            performance: false,
+            functional: false,
+            advertising: false,
+            socialMedia: false,
+        };
+
         // Save consent preferences in the Consents collection
         const newConsent = new Consent({
-            consentId: newUser.consentId, // Use the auto-generated consentId
             userId: newUser._id, // Link to the user's _id
-            preferences, // Store cookie preferences
+            preferences: defaultPreferences, // Use provided preferences or defaults
         });
 
         await newConsent.save();

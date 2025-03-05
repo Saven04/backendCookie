@@ -1,86 +1,49 @@
-require("dotenv").config();
+require("dotenv").config(); // Load environment variables
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const bodyParser = require("body-parser");
-const requestIp = require("request-ip");
+const requestIp = require("request-ip"); // ✅ Get real client IP
 const axios = require("axios");
-const session = require("express-session");
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const helmet = require("helmet");
-const rateLimit = require("express-rate-limit");
-const cookieParser = require("cookie-parser");
+const session = require("express-session"); // Add session support
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
 const newsRoutes = require("./routes/newsRoutes");
-const consentRoutes = require("./routes/consentRoutes");
-const User = require("./models/user");
-const mfaRoutes = require("./routes/mfaRoutes");
-const supabase = require("./config/supabaseClient");
-const { verifyMfa } = require("./utils/mfa");
-
 const app = express();
 
-// ✅ Verify Supabase Initialization
-if (!supabase) {
-  console.error("❌ Supabase initialization failed!");
-  process.exit(1);
-}
-console.log("✅ Supabase initialized successfully.");
 
-// ✅ Middleware
+
 app.use(express.json());
-app.use(bodyParser.json());
-app.use(cookieParser());
-app.use(requestIp.mw()); // Capture client IP
-
-// ✅ Security Middleware
-app.use(helmet()); // Secure headers
-app.disable("x-powered-by"); // Hide tech details
-
-// ✅ Rate Limiting (Prevents Abuse)
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per window
-  message: { error: "Too many requests, please try again later." },
-});
-app.use(limiter);
-
-// ✅ CORS Configuration
+// CORS Configuration
 const allowedOrigins = ["https://t10hits.netlify.app"];
 app.use(
   cors({
     origin: allowedOrigins,
     credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization"], // Allow credentials headers
     methods: ["GET", "POST", "PUT", "DELETE"],
   })
 );
 
-// ✅ Session Configuration (Prevents Session Fixation)
-if (!process.env.SESSION_SECRET) {
-  console.error("❌ SESSION_SECRET is missing from .env file!");
-  process.exit(1);
-}
+// Middleware
+app.use(bodyParser.json());
+app.use(requestIp.mw()); // ✅ Middleware to capture client IP
+
+// Session Configuration
 app.use(
   session({
-    secret: process.env.SESSION_SECRET,
+    secret: process.env.SESSION_SECRET, // Use a strong secret key
     resave: false,
-    saveUninitialized: false,
+    saveUninitialized: true,
     cookie: {
-      secure: process.env.NODE_ENV === "production",
+      secure: process.env.NODE_ENV === "production", // Use `secure` cookies in production (HTTPS)
       httpOnly: true,
       sameSite: "strict",
     },
   })
 );
 
-// ✅ Connect to MongoDB
-if (!process.env.MONGO_URI) {
-  console.error("❌ MONGO_URI is missing from .env file!");
-  process.exit(1);
-}
+// Connect to MongoDB
 const connectDB = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI, {
@@ -96,25 +59,25 @@ const connectDB = async () => {
 };
 connectDB();
 
-// ✅ Routes
-app.use("/api", cookieRoutes);
-app.use("/api", authRoutes);
+// Routes
+app.use("/api", cookieRoutes); // Cookie-related routes
+app.use("/api", authRoutes); 
 app.use("/api/news", newsRoutes);
-app.use("/api/consent", consentRoutes);
-app.use("/api/mfa", mfaRoutes);
-app.use("/api", mfaRoutes);
 
-
-// ✅ Get Client IP & Geolocation Data (Privacy-Aware)
+// ✅ Route to get the real client IP and fetch geolocation data from `ip-api.com`
 app.get("/api/get-ipinfo", async (req, res) => {
   try {
     let clientIp = requestIp.getClientIp(req) || "Unknown";
+
     if (clientIp.includes("::ffff:")) {
       clientIp = clientIp.split("::ffff:")[1];
     }
+
     console.log("📌 Detected Client IP:", clientIp);
 
+    // Fetch geolocation data from `ip-api.com`
     const response = await axios.get(`http://ip-api.com/json/${clientIp}`);
+
     res.json({
       ip: clientIp,
       city: response.data.city || "Unknown",
@@ -128,73 +91,48 @@ app.get("/api/get-ipinfo", async (req, res) => {
   }
 });
 
-// ✅ Secure Login with Supabase MFA
+
 app.post("/api/login", async (req, res) => {
   try {
-    console.log("📩 Received login request:", req.body);
-    const { email, password, mfaCode } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
-    }
+      console.log("Received login request:", req.body); // Debug log
 
-    const user = await User.findOne({ email });
-    if (!user) return res.status(401).json({ message: "Invalid credentials" });
+      const { email, password } = req.body;
+      if (!email || !password) {
+          return res.status(400).json({ message: "Email and password are required" });
+      }
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
+      const user = await User.findOne({ email });
+      if (!user) {
+          return res.status(401).json({ message: "Invalid credentials" });
+      }
 
-    if (!user.consentId) return res.status(400).json({ message: "User consent ID is missing." });
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+          return res.status(401).json({ message: "Invalid credentials" });
+      }
 
-    // 🔹 Step 1: Verify MFA before issuing JWT
-    const isMfaValid = await verifyMfa(user.consentId, mfaCode, "email");
-    if (!isMfaValid) {
-      return res.status(401).json({ message: "Invalid MFA code" });
-    }
-
-    if (!process.env.JWT_SECRET) {
-      console.error("❌ JWT_SECRET is missing from .env file!");
-      process.exit(1);
-    }
-
-    // 🔹 Step 2: Generate Secure JWT Token
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
-
-    res.json({ token, user });
+      const token = jwt.sign({ id: user._id }, "secret_key", { expiresIn: "1h" });
+      return res.json({ token, user });
   } catch (error) {
-    console.error("❌ Login error:", error);
-    res.status(500).json({ message: "Internal server error" });
+      console.error("Login error:", error);
+      return res.status(500).json({ message: "Internal server error" });
   }
 });
 
-// ✅ Logout Route (Clears Session)
-app.post("/api/logout", (req, res) => {
-  req.session.destroy((err) => {
-    if (err) {
-      console.error("❌ Logout error:", err);
-      return res.status(500).json({ error: "Failed to log out" });
-    }
-    res.clearCookie("connect.sid"); // Clear session cookie
-    res.json({ message: "✅ Successfully logged out" });
-  });
-});
 
-// ✅ Health Check Route
+
+
+// Health check route
 app.get("/", (req, res) => {
-  res.status(200).json({ message: "✅ Server is running and healthy." });
+  res.status(200).json({ message: "✅ Server is running on Render and healthy." });
 });
 
-// ✅ 404 Handler
+// 404 Handler
 app.use((req, res, next) => {
   res.status(404).json({ message: "❌ Route not found." });
 });
 
-// ✅ Global Error Handler
-app.use((err, req, res, next) => {
-  console.error("❌ Server error:", err);
-  res.status(500).json({ error: "Internal server error" });
-});
-
-// ✅ Start the Server
+// Start the server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);

@@ -1,9 +1,9 @@
 const mongoose = require("mongoose");
 const crypto = require("crypto");
 
-// Function to hash sensitive data (email/phone)
-function hashData(data) {
-    return data ? crypto.createHash("sha256").update(data).digest("hex") : null;
+// Function to hash email before storing (optional for anonymization)
+function hashEmail(email) {
+    return crypto.createHash("sha256").update(email).digest("hex");
 }
 
 const UserSchema = new mongoose.Schema(
@@ -16,19 +16,8 @@ const UserSchema = new mongoose.Schema(
         type: String, 
         required: true, 
         unique: true, 
-        set: hashData // Hash email for privacy
+        set: hashEmail // Store hashed email for privacy
     },
-    phone: {
-        type: String,
-        required: false,
-        unique: true,
-        sparse: true,
-        set: function (phone) {
-            console.log("Raw Phone Input:", phone); // Debugging log
-            return phone ? hashData(phone) : null;
-        }
-    },
-    
     password: { 
         type: String, 
         required: true 
@@ -54,7 +43,7 @@ const UserSchema = new mongoose.Schema(
 );
 
 // **TTL Index for Auto-Deleting Inactive Users (1 Year)**
-UserSchema.index({ lastActive: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 365 });
+UserSchema.index({ lastActive: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 365 }); // 1 year
 
 // **TTL Index for Auto-Deleting User Data After Account Deletion (1 Year)**
 UserSchema.index({ deletedAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 365 });
@@ -64,19 +53,9 @@ UserSchema.methods.toJSON = function () {
     const obj = this.toObject();
     delete obj.password; // Remove password from API response
     obj.email = obj.email ? "**********" : null; // Mask email
-    obj.phone = obj.phone ? "**********" : null; // Mask phone number
     obj.consentId = obj.consentId ? "**********" : null; // Mask consentId in API responses
     return obj;
 };
-
-// **Drop the Old Index to Apply Fix**
-(async () => {
-    try {
-        await mongoose.connection.collection("users").dropIndex("phone_1"); // Drop old index
-    } catch (err) {
-        if (err.codeName !== "IndexNotFound") console.error("Index drop error:", err);
-    }
-})();
 
 const User = mongoose.model("User", UserSchema);
 module.exports = User;

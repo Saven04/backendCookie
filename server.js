@@ -1,83 +1,44 @@
-require("dotenv").config(); // Load environment variables
 const express = require("express");
 const mongoose = require("mongoose");
+const connectDB = require("./config/db"); // Ensure this function connects to MongoDB
 const cors = require("cors");
-const bodyParser = require("body-parser");
-const requestIp = require("request-ip"); // ✅ Middleware to capture client IP
-const session = require("express-session"); // Add session support
-
-// Import Routes
-const cookieRoutes = require("./routes/consentRoutes");
-const authRoutes = require("./routes/auth");
-const newsRoutes = require("./routes/newsRoutes");
-const locationRoutes = require("./routes/locationRoutes");
+const bodyParser = require("body-parser"); // Import body-parser
+const cookieRoutes = require("./routes/cookieRoutes"); // Ensure this file and its routes are properly set up
 
 const app = express();
 
 // Middleware
-app.use(express.json());
-app.use(bodyParser.json());
-app.use(requestIp.mw()); // ✅ Middleware to capture client IP
-
-// CORS Configuration
-const allowedOrigins = ["https://t10hits.netlify.app"];
-app.use(
-  cors({
-    origin: allowedOrigins,
-    credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"], // Allow credentials headers
-    methods: ["GET", "POST", "PUT", "DELETE"],
-  })
-);
-
-// Session Configuration
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "default_secret", // Use a strong secret key
-    resave: false,
-    saveUninitialized: true,
-    cookie: {
-      secure: process.env.NODE_ENV === "production", // Use `secure` cookies in production (HTTPS)
-      httpOnly: true,
-      sameSite: "strict",
-    },
-  })
-);
+app.use(bodyParser.json());  // Now it is correctly applied after app is initialized
+app.use(cors({ origin: 'http://127.0.0.1:5500' })); // Allows requests from your frontend
 
 // Connect to MongoDB
-const connectDB = async () => {
-  try {
-    await mongoose.connect(process.env.MONGO_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      dbName: "CookieDB",
-    });
-    console.log("✅ Connected to MongoDB successfully");
-  } catch (err) {
-    console.error("❌ MongoDB connection error:", err);
-    process.exit(1);
-  }
-};
-connectDB();
+connectDB()
+  .then(() => console.log("Connected to MongoDB successfully"))
+  .catch((err) => {
+    console.error("Error connecting to MongoDB:", err);
+    process.exit(1); // Exit the process if the database connection fails
+  });
 
 // Routes
-app.use("/api", cookieRoutes); // Cookie-related routes
-app.use("/api", authRoutes); // Authentication routes
-app.use("/api/news", newsRoutes); // News-related routes
-app.use("/api", locationRoutes); // Location-related routes
+app.use("/api", cookieRoutes); // Mount cookieRoutes at /api
 
-// ✅ Health Check Route
+
+app.post("/api/save", (req, res) => {
+    try {
+        // Your code here
+    } catch (error) {
+        console.error(error);  // This will help you identify what's going wrong
+        res.status(500).send("Internal Server Error");
+    }
+});
+
+// Health check route (optional for debugging)
 app.get("/", (req, res) => {
-  res.status(200).json({ message: "✅ Server is running on Render and healthy." });
+  res.status(200).send("Server is running and healthy.");
 });
 
-// 404 Handler
-app.use((req, res, next) => {
-  res.status(404).json({ message: "❌ Route not found." });
-});
-
-// Start the Server
+// Start the server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`Server is running on http://localhost:${PORT}`);
 });

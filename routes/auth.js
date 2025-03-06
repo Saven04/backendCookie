@@ -9,6 +9,8 @@ router.use(express.json());
 // POST /register - Register a new user
 router.post("/register", async (req, res) => {
     try {
+        console.log("📩 Incoming request data:", req.body); // Debugging log
+
         let { username, email, password, consentId } = req.body;
 
         // Trim inputs to prevent accidental spaces
@@ -27,9 +29,10 @@ router.post("/register", async (req, res) => {
             return res.status(400).json({ message: "Invalid email format!" });
         }
 
-        // Ensure consentId is provided if required
+        // Generate Consent ID if not provided
         if (!consentId) {
-            return res.status(400).json({ message: "Consent ID is required!" });
+            console.log("⚠️ No Consent ID provided. Generating new Consent ID...");
+            consentId = crypto.randomUUID();
         }
 
         // Check if the user already exists
@@ -50,14 +53,16 @@ router.post("/register", async (req, res) => {
         });
 
         await newUser.save();
+        console.log("✅ User registered successfully:", email);
 
-        res.status(201).json({ message: "User registered successfully!" });
+        res.status(201).json({ message: "User registered successfully!", consentId });
 
     } catch (error) {
         console.error("❌ Error in /register:", error);
         res.status(500).json({ message: "Internal Server Error. Please try again later." });
     }
 });
+
 // POST /login - Authenticate a user
 router.post("/login", async (req, res) => {
     try {

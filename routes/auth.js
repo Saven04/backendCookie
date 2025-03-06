@@ -9,22 +9,37 @@ router.use(express.json());
 // POST /register - Register a new user
 router.post("/register", async (req, res) => {
     try {
-        const { username, email, password, consentId } = req.body;
+        let { username, email, password, consentId } = req.body;
 
-        if (!username || !email || !password || !consentId) {
-            return res.status(400).json({ message: "All fields are required!" });
+        // Trim inputs to prevent accidental spaces
+        username = username?.trim();
+        email = email?.trim();
+        password = password?.trim();
+
+        // Validate required fields
+        if (!username || !email || !password) {
+            return res.status(400).json({ message: "Username, email, and password are required!" });
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ message: "Invalid email format!" });
+        }
+
+        // Ensure consentId is provided if required
+        if (!consentId) {
+            return res.status(400).json({ message: "Consent ID is required!" });
         }
 
         // Check if the user already exists
         const existingUser = await User.findOne({ email });
-
         if (existingUser) {
-            return res.status(400).json({ message: "Email already in use!" });
+            return res.status(409).json({ message: "Email already in use!" });
         }
 
-        // Hash the password
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
+        // Hash the password securely
+        const hashedPassword = await bcrypt.hash(password, 10);
 
         // Create and save the new user
         const newUser = new User({
@@ -37,12 +52,12 @@ router.post("/register", async (req, res) => {
         await newUser.save();
 
         res.status(201).json({ message: "User registered successfully!" });
+
     } catch (error) {
         console.error("❌ Error in /register:", error);
-        res.status(500).json({ message: "Server error. Please try again later." });
+        res.status(500).json({ message: "Internal Server Error. Please try again later." });
     }
 });
-
 // POST /login - Authenticate a user
 router.post("/login", async (req, res) => {
     try {

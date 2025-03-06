@@ -10,7 +10,7 @@ const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/userRoutes");
 const newsRoutes = require("./routes/newsRoutes");
-const preferencesRoutes = require("./routes/preferencesRoutes");
+const preferencesRoutes = require("./routes/PreferenceRoutes");
 const app = express();
 
 

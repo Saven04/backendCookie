@@ -8,7 +8,7 @@ const axios = require("axios");
 const session = require("express-session"); // Add session support
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
-const userRoutes = require("./routes/user");
+const userRoutes = require("./routes/userRoutes");
 const newsRoutes = require("./routes/newsRoutes");
 const app = express();
 

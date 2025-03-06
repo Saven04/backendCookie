@@ -43,4 +43,27 @@ const saveLocationData = async ({ consentId, ipAddress, isp, city, country, lati
     }
 };
 
-module.exports = { saveLocationData };
+// Function to delete location data by consentId
+const deleteLocationData = async (consentId) => {
+    try {
+        if (!consentId) {
+            throw new Error("Consent ID is required.");
+        }
+
+        console.log(`🔹 Deleting Location Data for Consent ID: ${consentId}`);
+
+        const result = await Location.deleteOne({ consentId });
+
+        if (result.deletedCount === 0) {
+            throw new Error(`No location data found for Consent ID: ${consentId}`);
+        }
+
+        console.log("✅ Location data deleted successfully.");
+        return { message: "Location data deleted successfully", consentId };
+    } catch (error) {
+        console.error("❌ Error deleting location data:", error.message);
+        throw new Error("Failed to delete location data: " + error.message);
+    }
+};
+
+module.exports = { saveLocationData, deleteLocationData };

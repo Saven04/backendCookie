@@ -1,20 +1,30 @@
 const mongoose = require("mongoose");
 
+// Load environment variables
+require("dotenv").config();
+
 const connectDB = async () => {
   try {
-    const dbURI = "mongodb://localhost:27017/CookieDB";
+    const dbURI = process.env.MONGO_URI;
 
-    // Connect to MongoDB
     await mongoose.connect(dbURI, {
-      useNewUrlParser: true, // Ensures the new MongoDB connection string parser is used
-      useUnifiedTopology: true, // Enables the new Server Discover and Monitoring engine
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
     });
 
-    console.log("MongoDB connected successfully.");
-  } catch (error) {
-    console.error("Error connecting to MongoDB:", error.message);
+    console.log("✅ MongoDB connected successfully.");
 
-    // Exit the process with a failure code (1) if the connection fails
+    // Handle connection events
+    mongoose.connection.on("disconnected", () => {
+      console.warn("⚠️ MongoDB disconnected. Attempting to reconnect...");
+      connectDB();
+    });
+
+    mongoose.connection.on("error", (err) => {
+      console.error("❌ MongoDB connection error:", err.message);
+    });
+  } catch (error) {
+    console.error("❌ Error connecting to MongoDB:", error.message);
     process.exit(1);
   }
 };

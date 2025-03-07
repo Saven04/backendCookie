@@ -1,8 +1,8 @@
 require("dotenv").config(); 
-import { createClient } from '@supabase/supabase-js';
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const { createClient } = require('@supabase/supabase-js');
 const bodyParser = require("body-parser");
 const requestIp = require("request-ip"); // ✅ Get real client IP
 const axios = require("axios");

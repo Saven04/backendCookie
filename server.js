@@ -1,4 +1,5 @@
-require("dotenv").config(); // Load environment variables
+require("dotenv").config(); 
+import { createClient } from '@supabase/supabase-js';
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -10,9 +11,12 @@ const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
 const deleteRoutes = require("./routes/deleteRoutes");
 const newsRoutes = require("./routes/newsRoutes");
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+
 const app = express();
-
-
 
 app.use(express.json());
 // CORS Configuration
@@ -67,11 +71,9 @@ app.use("/api/news", newsRoutes);
 app.use(deleteRoutes);
 
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Initialize Supabase client
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+
 
 // Send OTP Endpoint
 app.post('/send-otp', async (req, res) => {

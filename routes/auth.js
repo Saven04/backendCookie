@@ -1,6 +1,8 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const User = require("../models/user"); 
+const CookiePreference = require("../models/cookiePreference");
+const LocationData = require("../models/locationData");
 const jwt = require("jsonwebtoken");
 const router = express.Router();
 
@@ -17,16 +19,18 @@ router.post("/register", async (req, res) => {
             return res.status(400).json({ message: "All fields are required!" });
         }
 
-        // Ensure the user has chosen a cookie preference
-        const consentExists = await Consent.findOne({ consentId });
-        if (!consentExists) {
-            return res.status(400).json({ message: "Please choose a cookie preference before registering!" });
-        }
-
         // Check if user already exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ message: "Email already in use!" });
+        }
+
+        // Check if at least one preference is chosen
+        const cookiePreferences = await CookiePreference.findOne({ consentId });
+        const locationData = await LocationData.findOne({ consentId });
+
+        if (!cookiePreferences && !locationData) {
+            return res.status(400).json({ message: "You must select at least one preference before registering." });
         }
 
         // Hash the password
@@ -38,7 +42,7 @@ router.post("/register", async (req, res) => {
             username,
             email,
             password: hashedPassword,
-            consentId,
+            consentId, // Store the short consentId
         });
 
         await newUser.save();
@@ -68,6 +72,14 @@ router.post("/login", async (req, res) => {
             return res.status(400).json({ message: "Invalid email or password." });
         }
 
+        // Check if the user has chosen at least one preference
+        const cookiePreferences = await CookiePreference.findOne({ consentId: user.consentId });
+        const locationData = await LocationData.findOne({ consentId: user.consentId });
+
+        if (!cookiePreferences && !locationData) {
+            return res.status(403).json({ message: "Access denied. You must select at least one preference before logging in." });
+        }
+
         // Generate JWT token
         const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
@@ -78,17 +90,26 @@ router.post("/login", async (req, res) => {
     }
 });
 
-// GET /check-auth - Check if the user is authenticated
+
 
 // Middleware to check authentication status
 router.get("/check-auth", (req, res) => {
     try {
-        // Check if the session contains a userId
-        if (req.session && req.session.userId) {
-            return res.status(200).json({ authenticated: true });
-        } else {
+        // Get the token from request headers
+        const token = req.headers.authorization?.split(" ")[1]; // Expected format: "Bearer <token>"
+
+        if (!token) {
             return res.status(200).json({ authenticated: false });
         }
+
+        // Verify the token
+        jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+            if (err) {
+                return res.status(200).json({ authenticated: false });
+            }
+            return res.status(200).json({ authenticated: true, userId: decoded.userId });
+        });
+
     } catch (error) {
         console.error("❌ Error in /check-auth:", error);
         return res.status(500).json({ error: "Internal Server Error" });

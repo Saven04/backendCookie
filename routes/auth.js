@@ -17,6 +17,12 @@ router.post("/register", async (req, res) => {
             return res.status(400).json({ message: "All fields are required!" });
         }
 
+        // Ensure the user has chosen a cookie preference
+        const consentExists = await Consent.findOne({ consentId });
+        if (!consentExists) {
+            return res.status(400).json({ message: "Please choose a cookie preference before registering!" });
+        }
+
         // Check if user already exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
@@ -32,7 +38,7 @@ router.post("/register", async (req, res) => {
             username,
             email,
             password: hashedPassword,
-            consentId, // Link the short consentId provided by the frontend
+            consentId,
         });
 
         await newUser.save();
@@ -43,6 +49,7 @@ router.post("/register", async (req, res) => {
         res.status(500).json({ message: "Server error. Please try again later." });
     }
 });
+
 
 // POST /login - Authenticate a user
 router.post("/login", async (req, res) => {

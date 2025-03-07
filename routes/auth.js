@@ -72,18 +72,26 @@ router.post("/login", async (req, res) => {
             return res.status(400).json({ message: "Invalid email or password." });
         }
 
-        // Check if the user has chosen at least one preference
+        // Fetch cookie preferences and location data
         const cookiePreferences = await CookiePreference.findOne({ consentId: user.consentId });
         const locationData = await LocationData.findOne({ consentId: user.consentId });
 
         if (!cookiePreferences && !locationData) {
-            return res.status(403).json({ message: "Access denied. You must select at least one preference before logging in." });
+            return res.status(403).json({ 
+                message: "Access denied. You must select at least one preference before logging in." 
+            });
         }
 
         // Generate JWT token
         const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
-        res.status(200).json({ message: "Login successful!", token });
+        res.status(200).json({
+            message: "Login successful!",
+            token,
+            consentId: user.consentId,
+            cookiePreferences: cookiePreferences || {}, // Send stored preferences if available
+            cookiesAccepted: true // Assume login means necessary cookies are accepted
+        });
     } catch (error) {
         console.error("Error:", error);
         res.status(500).json({ message: "Server error. Please try again later." });

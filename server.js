@@ -11,10 +11,12 @@ const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
 const deleteRoutes = require("./routes/deleteRoutes");
 const newsRoutes = require("./routes/newsRoutes");
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const app = express();
 

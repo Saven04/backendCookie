@@ -1,4 +1,3 @@
-// routes/cookiePrefs.js
 const express = require("express");
 const router = express.Router();
 const CookiePreferences = require("../models/cookiePreference");
@@ -13,8 +12,8 @@ router.get("/", authMiddleware, async (req, res) => {
     }
 
     try {
-        // Retrieve consentId from cookies (primary source per your flow)
-        const consentId = req.cookies.consentId || req.body.consentId || req.query.consentId;
+        // Prioritize consentId from query, then cookies, then body
+        const consentId = req.query.consentId || req.cookies.consentId || req.body.consentId;
         if (!consentId) {
             return res.status(400).json({ message: "Consent ID not provided" });
         }
@@ -49,7 +48,7 @@ router.get("/", authMiddleware, async (req, res) => {
             message: error.message,
             stack: error.stack,
             userId: user._id,
-            consentId: req.cookies.consentId || req.body.consentId || req.query.consentId
+            consentId: req.query.consentId || req.cookies.consentId || req.body.consentId
         });
         res.status(500).json({ message: "Server error fetching preferences" });
     }

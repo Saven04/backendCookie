@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit'); // Import rate-limiting middleware
 const { createClient } = require('@supabase/supabase-js');
 
 // Initialize Supabase client
@@ -7,8 +8,15 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Send OTP Route
-router.post('/send-otp', async (req, res) => {
+// Rate limiter: Allow only 5 requests per hour for sending OTPs
+const otpLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 5, // Max 5 requests per hour
+    message: 'Too many OTP requests. Please try again later.',
+});
+
+// Send OTP Route (with rate limiting)
+router.post('/send-otp', otpLimiter, async (req, res) => {
     const { email } = req.body;
 
     if (!email) {

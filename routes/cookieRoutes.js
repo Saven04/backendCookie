@@ -106,4 +106,34 @@ router.post("/location", async (req, res) => {
 });
 
 
+
+
+
+// 👉 **NEW: Route to Delete User Data (Auto & Manual Deletion)**
+router.delete("/delete-my-data/:consentId", async (req, res) => {
+    try {
+        const { consentId } = req.params;
+
+        if (!consentId) {
+            return res.status(400).json({ error: "Consent ID is required" });
+        }
+
+        // Delete user's stored data in parallel
+        const [cookieDeleteResult, locationDeleteResult] = await Promise.all([
+            deleteCookiePreferences(consentId),
+            deleteLocationData(consentId)
+        ]);
+
+        res.status(200).json({ 
+            message: "Your data has been deleted successfully.",
+            cookieDeleteResult,
+            locationDeleteResult
+        });
+
+    } catch (error) {
+        console.error("❌ Error deleting user data:", error);
+        res.status(500).json({ error: "Failed to delete user data." });
+    }
+});
+
 module.exports = router;

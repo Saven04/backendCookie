@@ -1,5 +1,5 @@
 const express = require("express");
-const bcrypt = require("bcryptjs");
+const bcrypt = require("bcryptjs"); 
 const User = require("../models/user"); 
 const CookiePreference = require("../models/cookiePreference");
 const LocationData = require("../models/locationData");

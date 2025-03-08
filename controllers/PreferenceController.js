@@ -3,9 +3,9 @@
 const mongoose = require('mongoose');
 
 // Assuming these are your existing schema models
-const CookiePreference = mongoose.model('CookiePreference');
-const LocationData = mongoose.model('LocationData');
-const User = mongoose.model('User');
+const CookiePreference = mongoose.model('cookiePreference');
+const LocationData = mongoose.model('locationData');
+const User = mongoose.model('user');
 
 // Update cookie preferences
 const updateCookiePreferences = async (req, res) => {

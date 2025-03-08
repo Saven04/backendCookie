@@ -1,9 +1,6 @@
-
-const mongoose = require('mongoose');
-
 // Assuming these are your existing schema models
-const CookiePreference = require("../models/cookiePreference"); 
-const User = mongoose.model('User');
+const User = require("../models/user"); 
+const CookiePreference = require("../models/cookiePreference");;
 
 // Update cookie preferences
 const updateCookiePreferences = async (req, res) => {

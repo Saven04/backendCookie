@@ -3,7 +3,6 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const bodyParser = require("body-parser");
-const cookieParser = require("cookie-parser");
 const requestIp = require("request-ip"); // ✅ Get real client IP
 const axios = require("axios");
 const session = require("express-session"); // Add session support
@@ -16,7 +15,7 @@ const newsRoutes = require("./routes/newsRoutes");
 const app = express();
 
 
-app.use(cookieParser());
+
 app.use(express.json());
 // CORS Configuration
 const allowedOrigins = ["https://t10hits.netlify.app"];
@@ -24,7 +23,7 @@ app.use(
   cors({
     origin: allowedOrigins,
     credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization", "Consent-Id"], // Allow credentials headers
+    allowedHeaders: ["Content-Type", "Authorization"], // Allow credentials headers
     methods: ["GET", "POST", "PUT", "DELETE"],
   })
 );
@@ -70,7 +69,6 @@ app.use("/api", cookieRoutes); // Cookie-related routes
 app.use("/api", authRoutes); 
 app.use("/api/send-mfa", authMiddleware, sendMfaRoute(mfaCodes));
 app.use("/api/verify-mfa", authMiddleware, verifyMfaRoute(mfaCodes));
-app.use("/api/cookie-prefs", require("./routes/cookiePrefs"));
 app.use("/api/news", newsRoutes);
 
 // ✅ Route to get the real client IP and fetch geolocation data from `ip-api.com`

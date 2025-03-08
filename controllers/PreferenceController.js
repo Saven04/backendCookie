@@ -1,8 +1,6 @@
-// Assuming these are your existing schema models
-const User = require("../models/user"); 
-const CookiePreference = require("../models/cookiePreference");;
+const User = require("../models/user");
+const CookiePreference = require("../models/cookiePreference");
 
-// Update cookie preferences
 const updateCookiePreferences = async (req, res) => {
     try {
         const { consentId, preferences, deletedAt } = req.body;
@@ -14,38 +12,44 @@ const updateCookiePreferences = async (req, res) => {
             });
         }
 
+        if (!preferences || typeof preferences !== 'object') {
+            return res.status(400).json({
+                success: false,
+                message: 'Preferences object is required'
+            });
+        }
+
         // Find existing cookie preference document by consentId
         let cookiePref = await CookiePreference.findOne({ consentId });
 
+        // Prepare the preferences object based on schema
+        const updatedPreferences = {
+            strictlyNecessary: true, // Always true as per schema default
+            performance: preferences.performance || false,
+            functional: preferences.functional || false,
+            advertising: preferences.advertising || false,
+            socialMedia: preferences.socialMedia || false
+        };
+
         if (!cookiePref) {
-            // If no existing record found, create a new one
+            // Create new record if none exists
             cookiePref = new CookiePreference({
                 consentId,
-                preferences: {
-                    essential: true, // Always true
-                    analytics: preferences.analytics || false,
-                    marketing: preferences.marketing || false
-                },
-                timestamp: preferences.timestamp || new Date(),
+                preferences: updatedPreferences,
                 deletedAt: deletedAt || null
             });
         } else {
             // Update existing record
-            cookiePref.preferences = {
-                essential: true, // Always true
-                analytics: preferences.analytics || false,
-                marketing: preferences.marketing || false
-            };
-            cookiePref.timestamp = preferences.timestamp || new Date();
+            cookiePref.preferences = updatedPreferences;
             cookiePref.deletedAt = deletedAt || null;
         }
 
-        // Save the updated/new document
+        // Save the document (Mongoose will apply timestamps and validation)
         await cookiePref.save();
 
-        // Optionally, you might want to update the user's last modified date
+        // Optionally update user's last modified date
         await User.findOneAndUpdate(
-            { consentId }, // Assuming consentId is linked to user
+            { consentId }, // Assuming consentId links to user
             { updatedAt: new Date() },
             { new: true }
         );
@@ -56,7 +60,7 @@ const updateCookiePreferences = async (req, res) => {
             data: {
                 consentId: cookiePref.consentId,
                 preferences: cookiePref.preferences,
-                timestamp: cookiePref.timestamp,
+                createdAt: cookiePref.createdAt,
                 deletedAt: cookiePref.deletedAt
             }
         });
@@ -70,7 +74,6 @@ const updateCookiePreferences = async (req, res) => {
     }
 };
 
-// Export the controller function
 module.exports = {
     updateCookiePreferences
 };

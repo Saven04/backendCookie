@@ -75,22 +75,17 @@ router.post("/login", async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // Hash the email to match the stored hashed email in User schema
         const hashedEmail = crypto.createHash("sha256").update(email).digest("hex");
-
-        // Find the user
         const user = await User.findOne({ email: hashedEmail });
         if (!user) {
             return res.status(400).json({ message: "Invalid email or password." });
         }
 
-        // Compare passwords
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
             return res.status(400).json({ message: "Invalid email or password." });
         }
 
-        // Fetch cookie preferences and location data
         const cookiePreferences = await CookiePreferences.findOne({ consentId: user.consentId });
         const locationData = await Location.findOne({ consentId: user.consentId });
 
@@ -100,13 +95,9 @@ router.post("/login", async (req, res) => {
             });
         }
 
-        // Generate JWT token, including raw email for MFA
         const token = jwt.sign(
-            { 
-                userId: user._id, 
-                rawEmail: email // Include raw email in payload for MFA
-            }, 
-            process.env.JWT_SECRET, 
+            { userId: user._id, rawEmail: email },
+            process.env.JWT_SECRET,
             { expiresIn: "1h" }
         );
 

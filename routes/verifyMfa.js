@@ -1,6 +1,8 @@
 // routes/verifyMfa.js
 const express = require("express");
 const router = express.Router();
+const CookiePreferences = require("../models/cookiePreference"); // Updated model name
+const Location = require("../models/locationData"); // Updated model name
 const authMiddleware = require("../middleware/authMiddleware");
 
 let mfaCodes;
@@ -18,28 +20,38 @@ router.post("/", authMiddleware, async (req, res) => {
         return res.status(400).json({ message: "Invalid or expired code" });
     }
 
+    const consentId = storedData.consentId; // Get consentId from mfaCodes
+    if (!consentId) {
+        return res.status(400).json({ message: "Consent ID not found" });
+    }
+
     try {
-        // Update user in database
+        // Update records in database
         const deletedAt = new Date();
 
-        // Delete non-essential cookie preferences, preserve consentId, and add deletedAt timestamp
-        await User.updateOne(
-            { _id: user._id },
+        // Update CookiePreferences: Reset non-essential preferences, add deletedAt, preserve consentId
+        await CookiePreferences.updateOne(
+            { consentId: consentId }, // Query by consentId
             {
-                $unset: { "cookiePreferences.nonEssential": "" }, // Remove nonEssential field
-                $set: { "cookiePreferences.deletedAt": deletedAt } // Add timestamp, consentId unchanged
+                $set: {
+                    "preferences.performance": false,
+                    "preferences.functional": false,
+                    "preferences.advertising": false,
+                    "preferences.socialMedia": false,
+                    deletedAt: deletedAt // Dynamically add deletedAt
+                }
             }
         );
 
-        // Update location data with deletedAt timestamp (soft delete), preserve consentId
-        await User.updateOne(
-            { _id: user._id },
+        // Update Location: Add deletedAt timestamp (soft delete)
+        await Location.updateOne(
+            { consentId: consentId }, // Query by consentId
             {
-                $set: { "locationData.deletedAt": deletedAt } // Soft delete with timestamp
+                $set: { deletedAt: deletedAt } // Dynamically add deletedAt
             }
         );
 
-        // Clear the MFA code from the Map, but preserve consentId in storedData if needed elsewhere
+        // Clear the MFA code from the Map
         mfaCodes.delete(user._id.toString());
 
         res.status(200).json({ message: "Data deleted successfully" });

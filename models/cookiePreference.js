@@ -18,9 +18,13 @@ const cookiePreferencesSchema = new mongoose.Schema(
     },
     createdAt: {
       type: Date,
-      default: () => moment().tz("Asia/Kolkata").toDate(), 
+      default: () => moment().tz("Asia/Kolkata").toDate(),
       expires: 60 * 60 * 24 * 730, // Auto-delete after 2 years (730 days)
     },
+    deletedAt: {
+      type: Date,
+      default: null // Optional field for soft deletion
+    }
   },
   {
     timestamps: true,

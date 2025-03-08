@@ -10,6 +10,7 @@ const locationSchema = new mongoose.Schema(
     latitude: { type: Number },
     longitude: { type: Number },
     createdAt: { type: Date, default: Date.now, expires: 60 * 60 * 24 * 90 }, // Auto-delete after 90 days
+    deletedAt: { type: Date, default: null } // Optional field for soft deletion
   },
   { timestamps: true }
 );

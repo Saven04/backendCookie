@@ -2,6 +2,7 @@
 const express = require("express");
 const router = express.Router();
 const nodemailer = require("nodemailer");
+const CookiePreferences = require("../models/cookiePreference"); // Import model
 
 const transporter = nodemailer.createTransport({
     service: "gmail",
@@ -11,32 +12,29 @@ const transporter = nodemailer.createTransport({
 let mfaCodes;
 
 router.post("/", async (req, res) => {
-    const user = req.user; // From JWT middleware
-    if (!user) {
-        return res.status(401).json({ message: "Unauthorized" });
-    }
-
-    // Get email from request body (sent by frontend), fallback to user.email from JWT
-    const email = req.body.email || req.user.email;
-    if (!email) {
-        return res.status(400).json({ message: "Email is required" });
-    }
-
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-        return res.status(400).json({ message: "Invalid email format" });
+    const user = req.user;
+    if (!user || !user._id) {
+        return res.status(401).json({ message: "Unauthorized: User not authenticated" });
     }
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expires = Date.now() + 5 * 60 * 1000; // 5 minutes expiry
 
-    // Store MFA code with user ID
-    mfaCodes.set(user._id.toString(), { code, expires, consentId: user.consentId });
+    // Fetch consentId from CookiePreferences if not in req.user
+    let consentId = user.consentId;
+    if (!consentId) {
+        const cookiePrefs = await CookiePreferences.findOne({ /* criteria to find user's preferences */ });
+        if (!cookiePrefs) {
+            return res.status(400).json({ message: "No cookie preferences found for user" });
+        }
+        consentId = cookiePrefs.consentId;
+    }
+
+    mfaCodes.set(user._id.toString(), { code, expires, consentId });
 
     const mailOptions = {
         from: process.env.EMAIL_USER,
-        to: email, // Use the extracted email
+        to: req.body.email || req.user.email, // Use req.body.email first, fallback to req.user.email
         subject: "Your MFA Verification Code",
         text: `Your verification code is: ${code}. It expires in 5 minutes.`
     };
@@ -51,6 +49,6 @@ router.post("/", async (req, res) => {
 });
 
 module.exports = (codes) => {
-    mfaCodes = codes; // Initialize the mfaCodes Map
+    mfaCodes = codes;
     return router;
 };

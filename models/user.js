@@ -1,40 +1,61 @@
-// models/User.js
 const mongoose = require("mongoose");
 const crypto = require("crypto");
-const bcrypt = require("bcryptjs"); // Changed from bcrypt to bcryptjs
 
+// Function to hash email before storing (optional for anonymization)
 function hashEmail(email) {
     return crypto.createHash("sha256").update(email).digest("hex");
 }
 
 const UserSchema = new mongoose.Schema(
-    {
-        username: { type: String, required: true },
-        email: { type: String, required: true, unique: true, set: hashEmail },
-        password: { type: String, required: true },
-        consentId: { type: String, unique: true, required: true },
-        lastActive: { type: Date, default: Date.now },
-        deletedAt: { type: Date, default: null }
+  {
+    username: { 
+        type: String, 
+        required: true 
     },
-    { timestamps: true }
+    email: { 
+        type: String, 
+        required: true, 
+        unique: true, 
+        set: hashEmail // Store hashed email for privacy
+    },
+    password: { 
+        type: String, 
+        required: true 
+    }, // Use bcrypt hashing before storing
+
+    consentId: { 
+        type: String, 
+        unique: true, 
+        required: true, 
+        default: () => crypto.randomUUID() // Generate a unique consentId by default
+    }, // Link user with cookie consent data
+
+    lastActive: { 
+        type: Date, 
+        default: Date.now 
+    }, // Tracks last activity
+    deletedAt: { 
+        type: Date, 
+        default: null 
+    }, // Marks account for deletion
+  },
+  { timestamps: true }
 );
 
-UserSchema.pre("save", async function(next) {
-    if (this.isModified("password")) {
-        this.password = await bcrypt.hash(this.password, 10); // bcryptjs works the same
-    }
-    next();
-});
+// **TTL Index for Auto-Deleting Inactive Users (1 Year)**
+UserSchema.index({ lastActive: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 365 }); // 1 year
 
-UserSchema.index({ lastActive: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 365 });
+// **TTL Index for Auto-Deleting User Data After Account Deletion (1 Year)**
 UserSchema.index({ deletedAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 365 });
 
+// **Mask PII on API Responses**
 UserSchema.methods.toJSON = function () {
     const obj = this.toObject();
-    delete obj.password;
-    obj.email = "**********";
-    obj.consentId = "**********";
+    delete obj.password; // Remove password from API response
+    obj.email = obj.email ? "**********" : null; // Mask email
+    obj.consentId = obj.consentId ? "**********" : null; // Mask consentId in API responses
     return obj;
 };
 
-module.exports = mongoose.model("User", UserSchema);
+const User = mongoose.model("User", UserSchema);
+module.exports = User;

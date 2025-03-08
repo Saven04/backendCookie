@@ -28,6 +28,8 @@ app.use(
   })
 );
 
+const mfaCodes = new Map();
+
 // Middleware
 app.use(bodyParser.json());
 app.use(requestIp.mw()); // ✅ Middleware to capture client IP

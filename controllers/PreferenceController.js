@@ -3,7 +3,6 @@ const mongoose = require('mongoose');
 
 // Assuming these are your existing schema models
 const CookiePreference = require("../models/cookiePreference"); 
-const LocationData = mongoose.model('locationData');
 const User = mongoose.model('user');
 
 // Update cookie preferences

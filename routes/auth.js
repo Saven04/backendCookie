@@ -1,10 +1,9 @@
 const express = require("express");
-const bcrypt = require("bcryptjs"); 
+const bcrypt = require("bcryptjs");
+const User = require("../models/user"); 
+const CookiePreference = require("../models/cookiePreference");
+const LocationData = require("../models/locationData");
 const jwt = require("jsonwebtoken");
-const crypto = require("crypto"); // Added import
-const User = require("../models/user"); // Case-sensitive, matches User.js
-const CookiePreferences = require("../models/cookiePreference"); // Standardized
-const Location = require("../models/locationData"); // Standardized
 const router = express.Router();
 
 // Middleware to parse JSON bodies
@@ -20,16 +19,15 @@ router.post("/register", async (req, res) => {
             return res.status(400).json({ message: "All fields are required!" });
         }
 
-        // Hash email to check for existing user (matches schema's set: hashEmail)
-        const hashedEmail = crypto.createHash("sha256").update(email).digest("hex");
-        const existingUser = await User.findOne({ email: hashedEmail });
+        // Check if user already exists
+        const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ message: "Email already in use!" });
         }
 
         // Check if at least one preference is chosen
-        const cookiePreferences = await CookiePreferences.findOne({ consentId });
-        const locationData = await Location.findOne({ consentId });
+        const cookiePreferences = await CookiePreference.findOne({ consentId });
+        const locationData = await LocationData.findOne({ consentId });
 
         if (!cookiePreferences && !locationData) {
             return res.status(400).json({ message: "You must select at least one preference before registering." });
@@ -42,52 +40,41 @@ router.post("/register", async (req, res) => {
         // Create new user and link the consentId
         const newUser = new User({
             username,
-            email, // Will be hashed by schema's set: hashEmail
+            email,
             password: hashedPassword,
-            consentId // Store the provided consentId
+            consentId, // Store the short consentId
         });
 
         await newUser.save();
 
-        // Generate JWT with raw email for MFA
-        const token = jwt.sign(
-            { userId: newUser._id, rawEmail: email },
-            process.env.JWT_SECRET,
-            { expiresIn: "1h" }
-        );
-
-        res.status(201).json({
-            message: "User registered successfully!",
-            token,
-            consentId: newUser.consentId
-        });
+        res.status(201).json({ message: "User registered successfully!" });
     } catch (error) {
         console.error("Error:", error);
-        if (error.name === "ValidationError") {
-            return res.status(400).json({ message: error.message });
-        }
         res.status(500).json({ message: "Server error. Please try again later." });
     }
 });
+
 
 // POST /login - Authenticate a user
 router.post("/login", async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        const hashedEmail = crypto.createHash("sha256").update(email).digest("hex");
-        const user = await User.findOne({ email: hashedEmail });
+        // Find the user
+        const user = await User.findOne({ email });
         if (!user) {
             return res.status(400).json({ message: "Invalid email or password." });
         }
 
+        // Compare passwords
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
             return res.status(400).json({ message: "Invalid email or password." });
         }
 
-        const cookiePreferences = await CookiePreferences.findOne({ consentId: user.consentId });
-        const locationData = await Location.findOne({ consentId: user.consentId });
+        // Fetch cookie preferences and location data
+        const cookiePreferences = await CookiePreference.findOne({ consentId: user.consentId });
+        const locationData = await LocationData.findOne({ consentId: user.consentId });
 
         if (!cookiePreferences && !locationData) {
             return res.status(403).json({ 
@@ -95,18 +82,15 @@ router.post("/login", async (req, res) => {
             });
         }
 
-        const token = jwt.sign(
-            { userId: user._id, rawEmail: email },
-            process.env.JWT_SECRET,
-            { expiresIn: "1h" }
-        );
+        // Generate JWT token
+        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
         res.status(200).json({
             message: "Login successful!",
             token,
             consentId: user.consentId,
-            cookiePreferences: cookiePreferences || {},
-            cookiesAccepted: true
+            cookiePreferences: cookiePreferences || {}, // Send stored preferences if available
+            cookiesAccepted: true // Assume login means necessary cookies are accepted
         });
     } catch (error) {
         console.error("Error:", error);

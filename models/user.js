@@ -1,7 +1,7 @@
 // models/User.js
 const mongoose = require("mongoose");
 const crypto = require("crypto");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs"); // Changed from bcrypt to bcryptjs
 
 function hashEmail(email) {
     return crypto.createHash("sha256").update(email).digest("hex");
@@ -21,7 +21,7 @@ const UserSchema = new mongoose.Schema(
 
 UserSchema.pre("save", async function(next) {
     if (this.isModified("password")) {
-        this.password = await bcrypt.hash(this.password, 10);
+        this.password = await bcrypt.hash(this.password, 10); // bcryptjs works the same
     }
     next();
 });

@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const CookiePreferences = require("../models/CookiePreferences");
-const Location = require("../models/Location");
+const CookiePreferences = require("../models/cookiePreference");
+const Location = require("../models/locationData");
 
 // In-memory MFA store (injected from server.js)
 let mfaCodes;

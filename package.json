@@ -9,6 +9,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
     "axios": "^1.8.1",
+    "bcrypt": "^5.1.1",
     "bcryptjs": "^2.4.3",
     "body-parser": "^1.20.3",
     "cors": "^2.8.5",
@@ -26,9 +27,20 @@
     "passport-facebook": "^3.0.0",
     "passport-google-oauth20": "^2.0.0",
     "request-ip": "^3.3.0",
+    "simple-encryptor": "^4.0.0",
     "supabase": "^2.15.8",
     "uuid": "^11.0.5"
   },
   "author": "Your Name",
-  "license": "ISC"
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Savenx20/backendCookie.git"
+  },
+  "keywords": [],
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Savenx20/backendCookie/issues"
+  },
+  "homepage": "https://github.com/Savenx20/backendCookie#readme"
 }

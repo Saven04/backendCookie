@@ -60,8 +60,11 @@ router.post("/login", async (req, res) => {
     try {
         const { email, password } = req.body;
 
+        // Hash the email to match the stored hashed email in User schema
+        const hashedEmail = require("crypto").createHash("sha256").update(email).digest("hex");
+
         // Find the user
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ email: hashedEmail });
         if (!user) {
             return res.status(400).json({ message: "Invalid email or password." });
         }
@@ -82,15 +85,22 @@ router.post("/login", async (req, res) => {
             });
         }
 
-        // Generate JWT token
-        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+        // Generate JWT token, including raw email for MFA
+        const token = jwt.sign(
+            { 
+                userId: user._id, 
+                rawEmail: email // Include raw email in payload for MFA
+            }, 
+            process.env.JWT_SECRET, 
+            { expiresIn: "1h" }
+        );
 
         res.status(200).json({
             message: "Login successful!",
             token,
             consentId: user.consentId,
-            cookiePreferences: cookiePreferences || {}, // Send stored preferences if available
-            cookiesAccepted: true // Assume login means necessary cookies are accepted
+            cookiePreferences: cookiePreferences || {},
+            cookiesAccepted: true
         });
     } catch (error) {
         console.error("Error:", error);
@@ -99,29 +109,5 @@ router.post("/login", async (req, res) => {
 });
 
 
-
-// Middleware to check authentication status
-router.get("/check-auth", (req, res) => {
-    try {
-        // Get the token from request headers
-        const token = req.headers.authorization?.split(" ")[1]; // Expected format: "Bearer <token>"
-
-        if (!token) {
-            return res.status(200).json({ authenticated: false });
-        }
-
-        // Verify the token
-        jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-            if (err) {
-                return res.status(200).json({ authenticated: false });
-            }
-            return res.status(200).json({ authenticated: true, userId: decoded.userId });
-        });
-
-    } catch (error) {
-        console.error("❌ Error in /check-auth:", error);
-        return res.status(500).json({ error: "Internal Server Error" });
-    }
-});
 
 module.exports = router;

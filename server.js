@@ -8,6 +8,9 @@ const axios = require("axios");
 const session = require("express-session"); // Add session support
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");
+const authMiddleware = require("./middleware/authMiddleware"); // Import middleware
+const sendMfaRoute = require("./routes/sendMfa");
+const verifyMfaRoute = require("./routes/verifyMfa");
 const newsRoutes = require("./routes/newsRoutes");
 const app = express();
 
@@ -62,6 +65,8 @@ connectDB();
 // Routes
 app.use("/api", cookieRoutes); // Cookie-related routes
 app.use("/api", authRoutes); 
+app.use("/api/send-mfa", authMiddleware, sendMfaRoute(mfaCodes));
+app.use("/api/verify-mfa", authMiddleware, verifyMfaRoute(mfaCodes));
 app.use("/api/news", newsRoutes);
 
 // ✅ Route to get the real client IP and fetch geolocation data from `ip-api.com`

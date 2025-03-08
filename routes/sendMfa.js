@@ -17,24 +17,22 @@ router.post("/", async (req, res) => {
         return res.status(401).json({ message: "Unauthorized: User not authenticated" });
     }
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const expires = Date.now() + 5 * 60 * 1000; // 5 minutes expiry
-
-    // Fetch consentId from CookiePreferences if not in req.user
-    let consentId = user.consentId;
-    if (!consentId) {
-        const cookiePrefs = await CookiePreferences.findOne({ /* criteria to find user's preferences */ });
-        if (!cookiePrefs) {
-            return res.status(400).json({ message: "No cookie preferences found for user" });
-        }
-        consentId = cookiePrefs.consentId;
+    const { email, consentId } = req.body;
+    if (!email) {
+        return res.status(400).json({ message: "Email is required" });
     }
+    if (!consentId) {
+        return res.status(400).json({ message: "Consent ID is required" });
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = Date.now() + 5 * 60 * 1000;
 
     mfaCodes.set(user._id.toString(), { code, expires, consentId });
 
     const mailOptions = {
         from: process.env.EMAIL_USER,
-        to: req.body.email || req.user.email, // Use req.body.email first, fallback to req.user.email
+        to: email,
         subject: "Your MFA Verification Code",
         text: `Your verification code is: ${code}. It expires in 5 minutes.`
     };

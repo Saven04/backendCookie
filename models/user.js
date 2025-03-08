@@ -1,7 +1,7 @@
 // models/User.js
 const mongoose = require("mongoose");
 const crypto = require("crypto");
-const { encrypt, decrypt } = require("simple-encryptor")(process.env.ENCRYPTION_KEY); // Example encryption
+const bcrypt = require("bcrypt");
 
 function hashEmail(email) {
     return crypto.createHash("sha256").update(email).digest("hex");
@@ -10,15 +10,21 @@ function hashEmail(email) {
 const UserSchema = new mongoose.Schema(
     {
         username: { type: String, required: true },
-        email: { type: String, required: true, unique: true, set: hashEmail }, // Hashed email
-        rawEmail: { type: String, required: true, set: v => encrypt(v), get: v => decrypt(v) }, // Encrypted raw email
+        email: { type: String, required: true, unique: true, set: hashEmail },
         password: { type: String, required: true },
-        consentId: { type: String, unique: true, required: true, default: () => crypto.randomUUID() },
+        consentId: { type: String, unique: true, required: true },
         lastActive: { type: Date, default: Date.now },
         deletedAt: { type: Date, default: null }
     },
-    { timestamps: true, toJSON: { getters: true } }
+    { timestamps: true }
 );
+
+UserSchema.pre("save", async function(next) {
+    if (this.isModified("password")) {
+        this.password = await bcrypt.hash(this.password, 10);
+    }
+    next();
+});
 
 UserSchema.index({ lastActive: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 365 });
 UserSchema.index({ deletedAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 365 });
@@ -28,7 +34,6 @@ UserSchema.methods.toJSON = function () {
     delete obj.password;
     obj.email = "**********";
     obj.consentId = "**********";
-    delete obj.rawEmail; // Never expose rawEmail in API responses
     return obj;
 };
 

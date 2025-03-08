@@ -19,15 +19,16 @@ router.post("/register", async (req, res) => {
             return res.status(400).json({ message: "All fields are required!" });
         }
 
-        // Check if user already exists
-        const existingUser = await User.findOne({ email });
+        // Hash email to check for existing user (matches schema's set: hashEmail)
+        const hashedEmail = crypto.createHash("sha256").update(email).digest("hex");
+        const existingUser = await User.findOne({ email: hashedEmail });
         if (existingUser) {
             return res.status(400).json({ message: "Email already in use!" });
         }
 
         // Check if at least one preference is chosen
-        const cookiePreferences = await CookiePreference.findOne({ consentId });
-        const locationData = await LocationData.findOne({ consentId });
+        const cookiePreferences = await CookiePreferences.findOne({ consentId });
+        const locationData = await Location.findOne({ consentId });
 
         if (!cookiePreferences && !locationData) {
             return res.status(400).json({ message: "You must select at least one preference before registering." });
@@ -40,16 +41,30 @@ router.post("/register", async (req, res) => {
         // Create new user and link the consentId
         const newUser = new User({
             username,
-            email,
+            email, // Will be hashed by schema's set: hashEmail
             password: hashedPassword,
-            consentId, // Store the short consentId
+            consentId // Store the provided consentId
         });
 
         await newUser.save();
 
-        res.status(201).json({ message: "User registered successfully!" });
+        // Generate JWT with raw email for MFA
+        const token = jwt.sign(
+            { userId: newUser._id, rawEmail: email },
+            process.env.JWT_SECRET,
+            { expiresIn: "1h" }
+        );
+
+        res.status(201).json({
+            message: "User registered successfully!",
+            token,
+            consentId: newUser.consentId
+        });
     } catch (error) {
         console.error("Error:", error);
+        if (error.name === "ValidationError") {
+            return res.status(400).json({ message: error.message });
+        }
         res.status(500).json({ message: "Server error. Please try again later." });
     }
 });

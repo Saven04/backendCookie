@@ -5,6 +5,7 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 const requestIp = require("request-ip"); // ✅ Get real client IP
 const axios = require("axios");
+const path = require('path');
 const session = require("express-session"); // Add session support
 const cookieRoutes = require("./routes/cookieRoutes");
 const authRoutes = require("./routes/auth");

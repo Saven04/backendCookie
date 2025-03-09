@@ -47,11 +47,11 @@ router.get('/user-profile', authMiddleware, async (req, res) => {
         const user = await User.findById(req.user.userId).select('-password');
         if (!user || user.deletedAt) return res.status(404).json({ success: false, message: 'User not found or deleted' });
 
-        const location = await Location.findOne({ consentId: user.consentId });
+        const location = await Location.findOne({ consentId: user.consentId }); // Use user's consentId
         res.json({
             success: true,
             username: user.username,
-            email: user.displayEmail, // Use displayEmail instead of hashed email
+            email: user.email, // Hashed, masked by toJSON
             profilePic: user.profilePic || null,
             location: location?.location || null
         });

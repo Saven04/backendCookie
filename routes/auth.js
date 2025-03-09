@@ -19,8 +19,8 @@ router.post("/register", async (req, res) => {
             return res.status(400).json({ message: "All fields are required!" });
         }
 
-        // Check if user already exists
-        const existingUser = await User.findOne({ email });
+        // Check if user already exists (using hashed email)
+        const existingUser = await User.findOne({ email: require('crypto').createHash('sha256').update(email).digest('hex') });
         if (existingUser) {
             return res.status(400).json({ message: "Email already in use!" });
         }
@@ -37,17 +37,24 @@ router.post("/register", async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Create new user and link the consentId
+        // Create new user with displayEmail and link consentId
         const newUser = new User({
             username,
-            email,
+            email, // Hashed automatically by set: hashEmail in schema
+            displayEmail: email, // Store unhashed email
             password: hashedPassword,
-            consentId, // Store the short consentId
+            consentId // Store the short consentId
         });
 
         await newUser.save();
 
-        res.status(201).json({ message: "User registered successfully!" });
+        // Generate JWT token (using userId for now, per your current setup)
+        const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET || 'your_jwt_secret', { expiresIn: '1h' });
+
+        res.status(201).json({ 
+            message: "User registered successfully!",
+            token // Return token for immediate login
+        });
     } catch (error) {
         console.error("Error:", error);
         res.status(500).json({ message: "Server error. Please try again later." });

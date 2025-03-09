@@ -14,9 +14,9 @@ const authMiddleware = (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
-        console.log('Decoded token:', decoded); // Debug: Check payload
-        req.user = decoded; // Expecting { consentId: "uuid", ... }
-        if (!req.user.consentId) throw new Error('Consent ID missing in token');
+        console.log('Decoded token:', decoded); // Debug: { userId: "67cc6d49e92d8a11f6b8f5a5", ... }
+        req.user = decoded;
+        if (!req.user.userId) throw new Error('User ID missing in token');
         next();
     } catch (error) {
         console.error('Token verification error:', error);
@@ -27,7 +27,7 @@ const authMiddleware = (req, res, next) => {
 // Multer Config
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, 'uploads/'),
-    filename: (req, file, cb) => cb(null, `${req.user.consentId}-${Date.now()}${path.extname(file.originalname)}`) // Use consentId
+    filename: (req, file, cb) => cb(null, `${req.user.userId}-${Date.now()}${path.extname(file.originalname)}`) // Use userId for filename
 });
 const upload = multer({
     storage,
@@ -44,10 +44,10 @@ const upload = multer({
 // GET /api/user-profile
 router.get('/user-profile', authMiddleware, async (req, res) => {
     try {
-        const user = await User.findOne({ consentId: req.user.consentId }).select('-password');
+        const user = await User.findById(req.user.userId).select('-password');
         if (!user || user.deletedAt) return res.status(404).json({ success: false, message: 'User not found or deleted' });
 
-        const location = await Location.findOne({ consentId: user.consentId });
+        const location = await Location.findOne({ consentId: user.consentId }); // Use user's consentId
         res.json({
             success: true,
             username: user.username,
@@ -67,8 +67,8 @@ router.post('/upload-profile-pic', authMiddleware, upload.single('profilePic'), 
         if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
 
         const profilePicPath = `/uploads/${req.file.filename}`;
-        const user = await User.findOneAndUpdate(
-            { consentId: req.user.consentId },
+        const user = await User.findByIdAndUpdate(
+            req.user.userId,
             { profilePic: profilePicPath, lastActive: Date.now() },
             { new: true }
         );
@@ -94,8 +94,8 @@ router.post('/update-profile', authMiddleware, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Valid username is required' });
         }
 
-        const user = await User.findOneAndUpdate(
-            { consentId: req.user.consentId },
+        const user = await User.findByIdAndUpdate(
+            req.user.userId,
             { username: username.trim(), lastActive: Date.now() },
             { new: true }
         );

@@ -2,7 +2,6 @@
 const mongoose = require("mongoose");
 const crypto = require("crypto");
 
-// Function to hash email before storing
 function hashEmail(email) {
     return crypto.createHash("sha256").update(email).digest("hex");
 }
@@ -17,12 +16,18 @@ const UserSchema = new mongoose.Schema(
             type: String, 
             required: true, 
             unique: true, 
-            set: hashEmail // Store hashed email
+            set: hashEmail // Hashed for storage
+        },
+        displayEmail: { // New field for readable email
+            type: String,
+            required: true,
+            trim: true,
+            lowercase: true
         },
         password: { 
             type: String, 
             required: true 
-        }, // Assumes bcrypt hashing in your auth logic
+        },
         consentId: { 
             type: String, 
             unique: true, 
@@ -32,7 +37,7 @@ const UserSchema = new mongoose.Schema(
         profilePic: { 
             type: String, 
             default: null 
-        }, // Added for profile picture
+        },
         lastActive: { 
             type: Date, 
             default: Date.now 
@@ -46,15 +51,15 @@ const UserSchema = new mongoose.Schema(
 );
 
 // TTL Indexes
-UserSchema.index({ lastActive: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 365 }); // 1 year
+UserSchema.index({ lastActive: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 365 });
 UserSchema.index({ deletedAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 365 });
 
-// Mask PII in API responses
+// Mask PII in API responses (optional, adjust as needed)
 UserSchema.methods.toJSON = function () {
     const obj = this.toObject();
-    delete obj.password; // Remove password
-    obj.email = obj.email ? "**********" : null; // Mask email
-    obj.consentId = obj.consentId ? "**********" : null; // Mask consentId
+    delete obj.password;
+    obj.email = obj.email; // Keep hashed email as-is
+    obj.consentId = "**********"; // Mask consentId
     return obj;
 };
 

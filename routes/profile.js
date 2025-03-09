@@ -11,10 +11,9 @@ const Location = require('../models/locationData');
 const authMiddleware = (req, res, next) => {
     const token = req.headers.authorization?.split('Bearer ')[1];
     if (!token) return res.status(401).json({ success: false, message: 'No token provided' });
-
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
-        req.user = decoded; // { id: user._id, ... }
+        req.user = decoded;
         next();
     } catch (error) {
         res.status(401).json({ success: false, message: 'Invalid token' });
@@ -28,7 +27,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
     storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const filetypes = /jpeg|jpg|png/;
         const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
@@ -43,12 +42,11 @@ router.get('/user-profile', authMiddleware, async (req, res) => {
     try {
         const user = await User.findById(req.user.id).select('-password');
         if (!user || user.deletedAt) return res.status(404).json({ success: false, message: 'User not found or deleted' });
-
         const location = await Location.findOne({ consentId: user.consentId });
         res.json({
             success: true,
-            username: user.username, // Use username instead of name
-            email: user.email, // Hashed, will be masked by toJSON
+            username: user.username,
+            email: user.email,
             profilePic: user.profilePic || null,
             location: location?.location || null
         });
@@ -66,7 +64,7 @@ router.post('/upload-profile-pic', authMiddleware, upload.single('profilePic'), 
         const profilePicPath = `/uploads/${req.file.filename}`;
         const user = await User.findByIdAndUpdate(
             req.user.id,
-            { profilePic: profilePicPath, lastActive: Date.now() }, // Update lastActive
+            { profilePic: profilePicPath, lastActive: Date.now() },
             { new: true }
         );
 
@@ -86,14 +84,14 @@ router.post('/upload-profile-pic', authMiddleware, upload.single('profilePic'), 
 // POST /api/update-profile
 router.post('/update-profile', authMiddleware, async (req, res) => {
     try {
-        const { username } = req.body; // Use username instead of name
+        const { username } = req.body;
         if (!username || typeof username !== 'string' || username.trim().length < 2) {
             return res.status(400).json({ success: false, message: 'Valid username is required' });
         }
 
         const user = await User.findByIdAndUpdate(
             req.user.id,
-            { username: username.trim(), lastActive: Date.now() }, // Update lastActive
+            { username: username.trim(), lastActive: Date.now() },
             { new: true }
         );
 

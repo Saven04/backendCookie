@@ -12,11 +12,14 @@ const authMiddleware = require("./middleware/authMiddleware"); // Import middlew
 const sendMfaRoute = require("./routes/sendMfa");
 const verifyMfaRoute = require("./routes/verifyMfa");
 const newsRoutes = require("./routes/newsRoutes");
+const profileRoutes = require('./routes/profile');
 const app = express();
 
 
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // For form data if needed
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // CORS Configuration
 const allowedOrigins = ["https://t10hits.netlify.app"];
 app.use(
@@ -69,6 +72,7 @@ app.use("/api", cookieRoutes); // Cookie-related routes
 app.use("/api", authRoutes); 
 app.use("/api/send-mfa", authMiddleware, sendMfaRoute(mfaCodes));
 app.use("/api/verify-mfa", authMiddleware, verifyMfaRoute(mfaCodes));
+app.use('/api', profileRoutes);
 app.use("/api/news", newsRoutes);
 
 // ✅ Route to get the real client IP and fetch geolocation data from `ip-api.com`

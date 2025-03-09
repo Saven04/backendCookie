@@ -11,11 +11,15 @@ const Location = require('../models/locationData');
 const authMiddleware = (req, res, next) => {
     const token = req.headers.authorization?.split('Bearer ')[1];
     if (!token) return res.status(401).json({ success: false, message: 'No token provided' });
+
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
-        req.user = decoded;
+        console.log('Decoded token:', decoded); // Debug: Check payload
+        req.user = decoded; // Expecting { consentId: "uuid", ... }
+        if (!req.user.consentId) throw new Error('Consent ID missing in token');
         next();
     } catch (error) {
+        console.error('Token verification error:', error);
         res.status(401).json({ success: false, message: 'Invalid token' });
     }
 };
@@ -23,11 +27,11 @@ const authMiddleware = (req, res, next) => {
 // Multer Config
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, 'uploads/'),
-    filename: (req, file, cb) => cb(null, `${req.user.id}-${Date.now()}${path.extname(file.originalname)}`)
+    filename: (req, file, cb) => cb(null, `${req.user.consentId}-${Date.now()}${path.extname(file.originalname)}`) // Use consentId
 });
 const upload = multer({
     storage,
-    limits: { fileSize: 5 * 1024 * 1024 },
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
     fileFilter: (req, file, cb) => {
         const filetypes = /jpeg|jpg|png/;
         const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
@@ -40,13 +44,14 @@ const upload = multer({
 // GET /api/user-profile
 router.get('/user-profile', authMiddleware, async (req, res) => {
     try {
-        const user = await User.findById(req.user.id).select('-password');
+        const user = await User.findOne({ consentId: req.user.consentId }).select('-password');
         if (!user || user.deletedAt) return res.status(404).json({ success: false, message: 'User not found or deleted' });
+
         const location = await Location.findOne({ consentId: user.consentId });
         res.json({
             success: true,
             username: user.username,
-            email: user.email,
+            email: user.email, // Hashed, masked by toJSON
             profilePic: user.profilePic || null,
             location: location?.location || null
         });
@@ -62,8 +67,8 @@ router.post('/upload-profile-pic', authMiddleware, upload.single('profilePic'), 
         if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
 
         const profilePicPath = `/uploads/${req.file.filename}`;
-        const user = await User.findByIdAndUpdate(
-            req.user.id,
+        const user = await User.findOneAndUpdate(
+            { consentId: req.user.consentId },
             { profilePic: profilePicPath, lastActive: Date.now() },
             { new: true }
         );
@@ -89,8 +94,8 @@ router.post('/update-profile', authMiddleware, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Valid username is required' });
         }
 
-        const user = await User.findByIdAndUpdate(
-            req.user.id,
+        const user = await User.findOneAndUpdate(
+            { consentId: req.user.consentId },
             { username: username.trim(), lastActive: Date.now() },
             { new: true }
         );

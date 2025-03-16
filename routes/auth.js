@@ -25,7 +25,7 @@ router.post("/register", async (req, res) => {
             return res.status(400).json({ message: "Email already in use!" });
         }
 
-        // Check if at least one preference is chosen or location data exists
+        // Check if at least one preference or location data exists
         const cookiePreferences = await CookiePreference.findOne({ consentId });
         const locationData = await LocationData.findOne({ consentId });
 
@@ -39,29 +39,39 @@ router.post("/register", async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Create new user and link the consentId
+        // Create and save new user
         const newUser = new User({
             username,
             email,
             password: hashedPassword,
-            consentId, // Store the short consentId
+            consentId,
         });
-
         await newUser.save();
+        console.log("User saved successfully:", newUser._id); // Debug log
 
-        // Optionally, generate a token for immediate login
-        const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, {
-            expiresIn: "1h",
-        });
+        // Verify JWT_SECRET exists
+        const jwtSecret = process.env.JWT_SECRET;
+        if (!jwtSecret) {
+            console.error("JWT_SECRET is not defined in environment variables");
+            return res.status(500).json({ message: "Server configuration error: JWT secret missing" });
+        }
 
-        // Return success response with the token
+        // Generate token
+        const token = jwt.sign({ userId: newUser._id }, jwtSecret, { expiresIn: "1h" });
+        console.log("Token generated:", token); // Debug log
+
+        // Return success response
         res.status(201).json({
             message: "User registered successfully!",
             token,
         });
     } catch (error) {
-        console.error("Error:", error);
-        res.status(500).json({ message: "Server error. Please try again later." });
+        console.error("Registration error:", {
+            message: error.message,
+            stack: error.stack,
+            body: req.body,
+        });
+        res.status(500).json({ message: error.message || "Server error. Please try again later." });
     }
 });
 

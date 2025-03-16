@@ -4,7 +4,7 @@ const Location = require("../models/locationData");
 
 router.post("/location", async (req, res) => {
     try {
-        let { consentId, ipAddress, isp, city, country, latitude, longitude } = req.body;
+        let { consentId, ipAddress, isp, city, country} = req.body;
 
         if (!consentId) {
             return res.status(400).json({ message: "Missing consent ID." });
@@ -20,14 +20,7 @@ router.post("/location", async (req, res) => {
             return res.status(400).json({ message: "IP address, ISP, city, and country must be strings." });
         }
 
-        // Validate latitude and longitude (if provided)
-        if (latitude !== undefined && (typeof latitude !== "number" || isNaN(latitude))) {
-            return res.status(400).json({ message: "Latitude must be a valid number." });
-        }
-
-        if (longitude !== undefined && (typeof longitude !== "number" || isNaN(longitude))) {
-            return res.status(400).json({ message: "Longitude must be a valid number." });
-        }
+        
 
         // Validate IP address format
         const ipRegex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
@@ -36,7 +29,7 @@ router.post("/location", async (req, res) => {
         }
 
         // Save location data
-        await saveLocationData({ consentId, ipAddress, isp, city, country, latitude, longitude });
+        await saveLocationData({ consentId, ipAddress, isp, city, country });
 
         res.status(200).json({ message: "Location data saved successfully." });
     } catch (error) {

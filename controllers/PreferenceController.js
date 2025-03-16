@@ -1,103 +1,119 @@
 const User = require("../models/user");
 const CookiePreference = require("../models/cookiePreference");
 const Location = require("../models/locationData");
+const SecurityLog = require("../models/SecurityLog");
 
 const updateCookiePreferences = async (req, res) => {
     try {
-        const { consentId, preferences, deletedAt, ipAddress, location } = req.body;
+        const { consentId, preferences, deletedAt, ipAddress, locationData } = req.body;
+        const token = req.headers.authorization?.split(" ")[1];
 
+        // Validation
         if (!consentId) {
             return res.status(400).json({
                 success: false,
-                message: 'Consent ID is required'
+                message: "Consent ID is required"
             });
         }
 
-        if (!preferences || typeof preferences !== 'object') {
+        if (!preferences || typeof preferences !== "object") {
             return res.status(400).json({
                 success: false,
-                message: 'Preferences object is required'
+                message: "Preferences object is required"
             });
         }
 
         // --- Update Cookie Preferences ---
-        let cookiePref = await CookiePreference.findOne({ consentId });
-
         const updatedPreferences = {
-            strictlyNecessary: true, // Always true as per schema default
+            strictlyNecessary: true,
             performance: preferences.performance || false,
             functional: preferences.functional || false,
             advertising: preferences.advertising || false,
             socialMedia: preferences.socialMedia || false
         };
 
-        if (!cookiePref) {
-            cookiePref = new CookiePreference({
-                consentId,
-                preferences: updatedPreferences,
-                deletedAt: deletedAt || null
-            });
-        } else {
-            cookiePref.preferences = updatedPreferences;
-            cookiePref.deletedAt = deletedAt || null;
-        }
-
-        await cookiePref.save();
+        const cookiePref = await CookiePreference.findOneAndUpdate(
+            { consentId },
+            { preferences: updatedPreferences, deletedAt: deletedAt || null },
+            { upsert: true, new: true }
+        );
 
         // --- Update Location Data ---
-        let locationDoc = await Location.findOne({ consentId });
-
-        // Only update location if user consents to performance or functional (GDPR compliance)
         const canUpdateLocation = preferences.performance || preferences.functional;
+        let locationDoc = null;
 
-        const updatedLocation = {
-            ipAddress: canUpdateLocation ? ipAddress || locationDoc?.location.ipAddress : null,
-            city: canUpdateLocation ? location?.city || locationDoc?.location.city : null,
-            country: canUpdateLocation ? location?.country || locationDoc?.location.country : null,
-            latitude: canUpdateLocation ? location?.latitude || locationDoc?.location.latitude : null,
-            longitude: canUpdateLocation ? location?.longitude || locationDoc?.location.longitude : null
-        };
+        if (canUpdateLocation && (ipAddress || locationData)) {
+            const updatedLocation = {
+                ipAddress: ipAddress || locationData?.ipAddress || "unknown",
+                country: locationData?.country || "unknown",
+                region: locationData?.region || null,
+                ipProvider: locationData?.ipProvider || "ipinfo", // Default to ipinfo if not specified
+                purpose: "consent-logging",
+                consentStatus: "accepted",
+                createdAt: new Date() // Refresh TTL
+            };
 
-        if (!locationDoc) {
-            if (canUpdateLocation) { // Only create if consent is given
-                locationDoc = new Location({
-                    consentId,
-                    location: updatedLocation,
-                    deletedAt: deletedAt || null
-                });
-            }
+            locationDoc = await Location.findOneAndUpdate(
+                { consentId },
+                updatedLocation,
+                { upsert: true, new: true }
+            );
         } else {
-            locationDoc.location = updatedLocation;
-            locationDoc.deletedAt = deletedAt || null;
+            // Mark existing location as deleted if consent is revoked
+            locationDoc = await Location.findOne({ consentId });
+            if (locationDoc) {
+                locationDoc.deletedAt = new Date();
+                await locationDoc.save();
+            }
         }
 
-        if (locationDoc) {
-            await locationDoc.save();
+        // --- Log Security Data ---
+        try {
+            await SecurityLog.create({
+                ipAddress: ipAddress || locationData?.ipAddress || "unknown",
+                consentId: canUpdateLocation ? consentId : null, // Link only if consented
+                timestamp: new Date(),
+                expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+            });
+        } catch (securityError) {
+            console.warn("Failed to log security data:", securityError.message);
+            // Non-blocking error
         }
 
         // --- Update User's Last Modified Date ---
-        await User.findOneAndUpdate(
+        const user = await User.findOneAndUpdate(
             { consentId }, // Assuming consentId links to user
             { updatedAt: new Date() },
             { new: true }
         );
 
+        if (!user && token) {
+            console.warn(`No user found for consentId: ${consentId}`);
+        }
+
         res.status(200).json({
             success: true,
-            message: 'Cookie preferences and location data updated successfully',
+            message: "Cookie preferences and location data updated successfully",
             data: {
                 consentId: cookiePref.consentId,
                 preferences: cookiePref.preferences,
                 createdAt: cookiePref.createdAt,
                 deletedAt: cookiePref.deletedAt,
-                location: locationDoc ? locationDoc.location : null
+                location: locationDoc ? {
+                    ipAddress: locationDoc.ipAddress,
+                    country: locationDoc.country,
+                    region: locationDoc.region,
+                    ipProvider: locationDoc.ipProvider,
+                    purpose: locationDoc.purpose,
+                    consentStatus: locationDoc.consentStatus
+                } : null
             }
         });
     } catch (error) {
-        console.error('Error updating cookie preferences and location data:', error);
+        console.error("Error updating cookie preferences and location data:", error);
         res.status(500).json({
             success: false,
-            message: 'Internal server error',
+            message: "Internal server error",
             error: error.message
         });
     }

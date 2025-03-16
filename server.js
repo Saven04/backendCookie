@@ -17,7 +17,6 @@ const deleteLocationRouter = require("./routes/delete-location");
 const securityLogRouter = require("./routes/security-log");
 const verifyMfaRoute = require("./routes/verifyMfa");
 const newsRoutes = require("./routes/newsRoutes");
-const profileRoutes = require('./routes/profile');
 const app = express();
 
 
@@ -78,7 +77,6 @@ app.use("/api", locationRoutes);
 app.use("/api", authRoutes); 
 app.use("/api/send-mfa", authMiddleware, sendMfaRoute(mfaCodes));
 app.use("/api/verify-mfa", authMiddleware, verifyMfaRoute(mfaCodes));
-app.use('/api', profileRoutes);
 app.use("/api", logoutRoutes);
 app.use("/api", deleteLocationRouter);
 app.use("/api", securityLogRouter);

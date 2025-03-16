@@ -2,64 +2,19 @@ const mongoose = require("mongoose");
 
 const locationSchema = new mongoose.Schema(
   {
-    consentId: {
-      type: String,
-      required: true,
-      index: true // Efficient querying for deletion by consentId
-    },
-    ipAddress: {
-      type: String,
-      required: true,
-      set: function (ip) {
-        const anonymizeIp = process.env.ANONYMIZE_IP === "true"; // Configurable via env
-        return anonymizeIp && ip ? ip.replace(/\.\d+$/, ".x") : ip;
-      }
-    },
-    country: {
-      type: String,
-      required: true // Sufficient for GDPR jurisdiction check
-    },
-    region: {
-      type: String,
-      default: null // Optional, coarse location
-    },
-    ipProvider: {
-      type: String,
-      required: true,
-      enum: ["ipinfo", "geoip", "manual", "unknown"], // List of possible providers
-      default: "unknown" // Fallback if not specified
-    },
-    createdAt: {
-      type: Date,
-      default: Date.now // Auto-set creation date
-    },
-    purpose: {
-      type: String,
-      enum: ["gdpr-jurisdiction", "consent-logging", "security"],
-      required: true // Explicit lawful basis
-    },
-    consentStatus: {
-      type: String,
-      enum: ["accepted", "rejected", "not-applicable"],
-      required: true // Track user consent
-    }
+    consentId: { type: String, required: true },
+    ipAddress: { type: String, required: true },
+    isp: { type: String, required: true },
+    city: { type: String, required: true },
+    country: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now, expires: 60 * 60 * 24 * 90 }, // Auto-delete after 90 days
+    deletedAt: { type: Date, default: null } // Optional field for soft deletion
   },
-  { timestamps: true } // Adds createdAt and updatedAt automatically
+  { timestamps: true }
 );
 
-// TTL index for automatic deletion after 90 days (2592000 seconds)
-locationSchema.index(
-  { createdAt: 1 },
-  { expireAfterSeconds: 60 * 60 * 24 * 90, background: true }
-);
-
-// Validate purpose aligns with consentStatus
-locationSchema.pre("validate", function (next) {
-  if (this.purpose === "consent-logging" && this.consentStatus === "rejected") {
-    next(new Error("Consent-logging purpose requires accepted consent"));
-  }
-  next();
-});
+// Ensure TTL Index is created
+locationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 90 });
 
 const Location = mongoose.model("Location", locationSchema);
 module.exports = Location;

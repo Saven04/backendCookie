@@ -1,8 +1,7 @@
 const express = require("express");
 const router = express.Router();
-
-// Assuming a MongoDB model for location data; adjust for your DB
-const Location = require("../models/locationData"); 
+const Location = require("../models/locationData");
+const SecurityLog = require("../models/SecurityLog");
 
 router.delete("/delete-location", async (req, res) => {
     try {
@@ -12,10 +11,23 @@ router.delete("/delete-location", async (req, res) => {
             return res.status(400).json({ message: "Token and consentId required" });
         }
 
-        const result = await Location.deleteMany({ consentId });
+        // Delete location data
+        const locationResult = await Location.deleteMany({ consentId });
+        console.log(`Deleted ${locationResult.deletedCount} location records`);
+
+        // Option 1: Nullify consentId in security logs (retain for security)
+        const securityUpdateResult = await SecurityLog.updateMany(
+            { consentId },
+            { $set: { consentId: null } }
+        );
+        console.log(`Anonymized ${securityUpdateResult.modifiedCount} security logs`);
+
+  
         res.status(200).json({
             message: "Location data deleted successfully",
-            deletedCount: result.deletedCount
+            locationDeletedCount: locationResult.deletedCount,
+            securityModifiedCount: securityUpdateResult.modifiedCount
+            // securityDeletedCount: securityDeleteResult.deletedCount // For Option 2
         });
     } catch (error) {
         console.error("Delete location error:", error);

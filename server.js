@@ -8,6 +8,7 @@ const axios = require("axios");
 const path = require('path');
 const session = require("express-session"); // Add session support
 const cookieRoutes = require("./routes/cookieRoutes");
+const locationRoutes = require("./routes/locationRoutes");
 const authRoutes = require("./routes/auth");
 const authMiddleware = require("./middleware/authMiddleware"); // Import middleware
 const sendMfaRoute = require("./routes/sendMfa");
@@ -69,39 +70,13 @@ const connectDB = async () => {
 connectDB();
 
 // Routes
-app.use("/api", cookieRoutes); // Cookie-related routes
+app.use("/api", cookieRoutes);
+app.use("/api", locationRoutes);  
 app.use("/api", authRoutes); 
 app.use("/api/send-mfa", authMiddleware, sendMfaRoute(mfaCodes));
 app.use("/api/verify-mfa", authMiddleware, verifyMfaRoute(mfaCodes));
 app.use('/api', profileRoutes);
 app.use("/api/news", newsRoutes);
-
-// ✅ Route to get the real client IP and fetch geolocation data from `ip-api.com`
-app.get("/api/get-ipinfo", async (req, res) => {
-  try {
-    let clientIp = requestIp.getClientIp(req) || "Unknown";
-
-    if (clientIp.includes("::ffff:")) {
-      clientIp = clientIp.split("::ffff:")[1];
-    }
-
-    console.log("📌 Detected Client IP:", clientIp);
-
-    // Fetch geolocation data from `ip-api.com`
-    const response = await axios.get(`http://ip-api.com/json/${clientIp}`);
-
-    res.json({
-      ip: clientIp,
-      city: response.data.city || "Unknown",
-      region: response.data.regionName || "Unknown",
-      country: response.data.country || "Unknown",
-      isp: response.data.isp || "Unknown",
-    });
-  } catch (error) {
-    console.error("❌ Error fetching IP info:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
 
 // Health check route
 app.get("/", (req, res) => {

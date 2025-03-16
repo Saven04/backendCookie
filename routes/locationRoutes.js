@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const Location = require("../models/locationData"); 
+const { saveLocationData } = require("../controllers/locationController");
 
 router.post("/location", async (req, res) => {
     try {

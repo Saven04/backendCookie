@@ -8,6 +8,7 @@ const axios = require("axios");
 const path = require('path');
 const session = require("express-session"); // Add session support
 const cookieRoutes = require("./routes/cookieRoutes");
+const logoutRoutes = require("./routes/logoutRoutes");
 const locationRoutes = require("./routes/locationRoutes");
 const authRoutes = require("./routes/auth");
 const authMiddleware = require("./middleware/authMiddleware"); // Import middleware
@@ -76,6 +77,7 @@ app.use("/api", authRoutes);
 app.use("/api/send-mfa", authMiddleware, sendMfaRoute(mfaCodes));
 app.use("/api/verify-mfa", authMiddleware, verifyMfaRoute(mfaCodes));
 app.use('/api', profileRoutes);
+app.use("/api", logoutRoutes);
 app.use("/api/news", newsRoutes);
 
 // Health check route

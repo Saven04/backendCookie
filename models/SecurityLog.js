@@ -10,12 +10,6 @@ const securityLogSchema = new mongoose.Schema({
             return anonymizeIp && ip ? ip.replace(/\.\d+$/, ".x") : ip;
         }
     },
-    consentId: {
-        type: String,
-        required: false, // Optional link to consent event
-        default: null,
-        index: true // For efficient querying/deletion
-    },
     timestamp: {
         type: Date,
         required: true,

@@ -11,7 +11,6 @@ const locationSchema = new mongoose.Schema(
       type: String,
       required: true,
       set: function (ip) {
-    
         const anonymizeIp = process.env.ANONYMIZE_IP === "true"; // Configurable via env
         return anonymizeIp && ip ? ip.replace(/\.\d+$/, ".x") : ip;
       }
@@ -23,6 +22,12 @@ const locationSchema = new mongoose.Schema(
     region: {
       type: String,
       default: null // Optional, coarse location
+    },
+    ipProvider: {
+      type: String,
+      required: true,
+      enum: ["ipinfo", "geoip", "manual", "unknown"], // List of possible providers
+      default: "unknown" // Fallback if not specified
     },
     createdAt: {
       type: Date,
@@ -48,7 +53,7 @@ locationSchema.index(
   { expireAfterSeconds: 60 * 60 * 24 * 90, background: true }
 );
 
-// Optional: Validate purpose aligns with consentStatus
+// Validate purpose aligns with consentStatus
 locationSchema.pre("validate", function (next) {
   if (this.purpose === "consent-logging" && this.consentStatus === "rejected") {
     next(new Error("Consent-logging purpose requires accepted consent"));

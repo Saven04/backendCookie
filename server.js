@@ -26,7 +26,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // For form data if needed
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // CORS Configuration
-const allowedOrigins = ["https://t10hits.netlify.app"];
+const allowedOrigins = ["https://pluspointnews.netlify.app"];
 app.use(
   cors({
     origin: allowedOrigins,

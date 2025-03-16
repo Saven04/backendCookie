@@ -59,9 +59,6 @@ router.post("/save", async (req, res) => {
     }
 });
 
-
-
-
 router.post('/update-cookie-prefs', PrefController.updateCookiePreferences);
 
 module.exports = router;

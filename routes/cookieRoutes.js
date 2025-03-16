@@ -62,29 +62,22 @@ router.post("/save", async (req, res) => {
 // 👉 **Updated POST Route to Save Location Data**
 router.post("/location", async (req, res) => {
     try {
-        let { consentId, ipAddress, isp, city, country, latitude, longitude } = req.body;
+        let { consentId, ipAddress, country, region, purpose, consentStatus } = req.body;
 
+        // Validate required fields
         if (!consentId) {
             return res.status(400).json({ message: "Missing consent ID." });
         }
-
-        // Validate required fields
-        if (!ipAddress || !isp || !city || !country) {
-            return res.status(400).json({ message: "IP address, ISP, city, and country are required." });
+        if (!ipAddress || !country || !purpose || !consentStatus) {
+            return res.status(400).json({ message: "IP address, country, purpose, and consent status are required." });
         }
 
         // Validate data types
-        if ([ipAddress, isp, city, country].some(field => typeof field !== "string")) {
-            return res.status(400).json({ message: "IP address, ISP, city, and country must be strings." });
+        if ([consentId, ipAddress, country, purpose, consentStatus].some(field => typeof field !== "string")) {
+            return res.status(400).json({ message: "Consent ID, IP address, country, purpose, and consent status must be strings." });
         }
-
-        // Validate latitude and longitude (if provided)
-        if (latitude !== undefined && (typeof latitude !== "number" || isNaN(latitude))) {
-            return res.status(400).json({ message: "Latitude must be a valid number." });
-        }
-
-        if (longitude !== undefined && (typeof longitude !== "number" || isNaN(longitude))) {
-            return res.status(400).json({ message: "Longitude must be a valid number." });
+        if (region && typeof region !== "string") {
+            return res.status(400).json({ message: "Region must be a string if provided." });
         }
 
         // Validate IP address format
@@ -93,10 +86,28 @@ router.post("/location", async (req, res) => {
             return res.status(400).json({ message: "Invalid IP address format." });
         }
 
-        // Save location data
-        await saveLocationData({ consentId, ipAddress, isp, city, country, latitude, longitude });
+        // Validate purpose and consentStatus against schema enums
+        const validPurposes = ["gdpr-jurisdiction", "consent-logging", "security"];
+        if (!validPurposes.includes(purpose)) {
+            return res.status(400).json({ message: "Invalid purpose. Must be one of: " + validPurposes.join(", ") });
+        }
+        const validConsentStatuses = ["accepted", "rejected", "not-applicable"];
+        if (!validConsentStatuses.includes(consentStatus)) {
+            return res.status(400).json({ message: "Invalid consent status. Must be one of: " + validConsentStatuses.join(", ") });
+        }
 
-        res.status(200).json({ message: "Location data saved successfully." });
+        // Save location data to MongoDB
+        const locationData = new Location({
+            consentId,
+            ipAddress, // Will be anonymized by schema setter if enabled
+            country,
+            region: region || null, // Optional field
+            purpose,
+            consentStatus
+        });
+        await locationData.save();
+
+        res.status(200).json({ message: "Location data saved successfully for GDPR compliance." });
     } catch (error) {
         console.error("Error saving location data:", error);
         res.status(500).json({
@@ -105,7 +116,6 @@ router.post("/location", async (req, res) => {
         });
     }
 });
-
 
 router.post('/update-cookie-prefs', PrefController.updateCookiePreferences);
 

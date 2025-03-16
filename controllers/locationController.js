@@ -1,7 +1,7 @@
 const Location = require("../models/locationData");
 
 // Function to save or update location data
-const saveLocationData = async ({ consentId, ipAddress, isp, city, country }) => {
+const saveLocationData = async ({ consentId, ipAddress, isp, city, country, latitude, longitude }) => {
     try {
         if (!consentId || !ipAddress || !isp || !city || !country) {
             throw new Error("Missing required fields: consentId, ipAddress, isp, city, and country are mandatory.");
@@ -18,6 +18,8 @@ const saveLocationData = async ({ consentId, ipAddress, isp, city, country }) =>
             locationData.isp = isp;
             locationData.city = city;
             locationData.country = country;
+            locationData.latitude = latitude;
+            locationData.longitude = longitude;
             await locationData.save();
             return { message: "Location data updated successfully.", consentId };
         } else {
@@ -28,6 +30,8 @@ const saveLocationData = async ({ consentId, ipAddress, isp, city, country }) =>
                 isp,
                 city,
                 country,
+                latitude,
+                longitude,
             });
 
             await locationData.save();

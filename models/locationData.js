@@ -2,56 +2,56 @@ const mongoose = require("mongoose");
 
 const locationSchema = new mongoose.Schema(
   {
-    consentId: { 
-      type: String, 
-      required: true, 
-      index: true // For efficient querying by consent event
+    consentId: {
+      type: String,
+      required: true,
+      index: true // Efficient querying for deletion by consentId
     },
-    ipAddress: { 
-      type: String, 
-      required: true, 
-      // Consider anonymizing IPs if full precision isn't needed
+    ipAddress: {
+      type: String,
+      required: true,
       set: function (ip) {
-        // Optional: Mask last octet for GDPR data minimization (e.g., 192.168.1.x)
-        return ip.replace(/\.\d+$/, ".x"); 
+    
+        const anonymizeIp = process.env.ANONYMIZE_IP === "true"; // Configurable via env
+        return anonymizeIp && ip ? ip.replace(/\.\d+$/, ".x") : ip;
       }
     },
-    country: { 
-      type: String, 
+    country: {
+      type: String,
       required: true // Sufficient for GDPR jurisdiction check
     },
-    region: { 
-      type: String, 
-      default: null // Optional, coarse location for compliance
+    region: {
+      type: String,
+      default: null // Optional, coarse location
     },
-    createdAt: { 
-      type: Date, 
-      default: Date.now, 
-      expires: 60 * 60 * 24 * 90 // Auto-delete after 90 days (TTL)
+    createdAt: {
+      type: Date,
+      default: Date.now // Auto-set creation date
     },
-    purpose: { 
-      type: String, 
-      enum: ["gdpr-jurisdiction", "consent-logging", "security"], 
-      required: true // Explicitly document the lawful basis
+    purpose: {
+      type: String,
+      enum: ["gdpr-jurisdiction", "consent-logging", "security"],
+      required: true // Explicit lawful basis
     },
-    consentStatus: { 
-      type: String, 
-      enum: ["accepted", "rejected", "not-applicable"], 
-      required: true // Track user consent decision
+    consentStatus: {
+      type: String,
+      enum: ["accepted", "rejected", "not-applicable"],
+      required: true // Track user consent
     }
   },
-  { timestamps: true }
+  { timestamps: true } // Adds createdAt and updatedAt automatically
 );
 
-// TTL index for automatic deletion after 90 days
-locationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 90 });
+// TTL index for automatic deletion after 90 days (2592000 seconds)
+locationSchema.index(
+  { createdAt: 1 },
+  { expireAfterSeconds: 60 * 60 * 24 * 90, background: true }
+);
 
-// Pre-save hook to ensure compliance with data minimization
-locationSchema.pre("save", function (next) {
-  // Example: Ensure no unnecessary precision in location data
-  if (this.latitude || this.longitude) {
-    this.latitude = undefined;
-    this.longitude = undefined; // Remove precise geolocation if present
+// Optional: Validate purpose aligns with consentStatus
+locationSchema.pre("validate", function (next) {
+  if (this.purpose === "consent-logging" && this.consentStatus === "rejected") {
+    next(new Error("Consent-logging purpose requires accepted consent"));
   }
   next();
 });

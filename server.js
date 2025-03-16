@@ -13,6 +13,8 @@ const locationRoutes = require("./routes/locationRoutes");
 const authRoutes = require("./routes/auth");
 const authMiddleware = require("./middleware/authMiddleware"); // Import middleware
 const sendMfaRoute = require("./routes/sendMfa");
+const deleteLocationRouter = require("./routes/delete-location");
+const securityLogRouter = require("./routes/security-log");
 const verifyMfaRoute = require("./routes/verifyMfa");
 const newsRoutes = require("./routes/newsRoutes");
 const profileRoutes = require('./routes/profile');
@@ -78,6 +80,8 @@ app.use("/api/send-mfa", authMiddleware, sendMfaRoute(mfaCodes));
 app.use("/api/verify-mfa", authMiddleware, verifyMfaRoute(mfaCodes));
 app.use('/api', profileRoutes);
 app.use("/api", logoutRoutes);
+app.use("/api", deleteLocationRouter);
+app.use("/api", securityLogRouter);
 app.use("/api/news", newsRoutes);
 
 // Health check route

@@ -25,12 +25,14 @@ router.post("/register", async (req, res) => {
             return res.status(400).json({ message: "Email already in use!" });
         }
 
-        // Check if at least one preference is chosen
+        // Check if at least one preference is chosen or location data exists
         const cookiePreferences = await CookiePreference.findOne({ consentId });
         const locationData = await LocationData.findOne({ consentId });
 
         if (!cookiePreferences && !locationData) {
-            return res.status(400).json({ message: "You must select at least one preference before registering." });
+            return res.status(400).json({
+                message: "You must select at least one cookie preference before registering.",
+            });
         }
 
         // Hash the password
@@ -47,13 +49,21 @@ router.post("/register", async (req, res) => {
 
         await newUser.save();
 
-        res.status(201).json({ message: "User registered successfully!" });
+        // Optionally, generate a token for immediate login
+        const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, {
+            expiresIn: "1h",
+        });
+
+        // Return success response with the token
+        res.status(201).json({
+            message: "User registered successfully!",
+            token,
+        });
     } catch (error) {
         console.error("Error:", error);
         res.status(500).json({ message: "Server error. Please try again later." });
     }
 });
-
 
 // POST /login - Authenticate a user
 router.post("/login", async (req, res) => {

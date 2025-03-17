@@ -16,6 +16,7 @@ const sendMfaRoute = require("./routes/sendMfa");
 const deleteLocationRouter = require("./routes/delete-location");
 const securityLogRouter = require("./routes/security-log");
 const verifyMfaRoute = require("./routes/verifyMfa");
+const AdminRoutes = require('./routes/api');
 const newsRoutes = require("./routes/newsRoutes");
 const app = express();
 
@@ -25,7 +26,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // For form data if needed
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // CORS Configuration
-const allowedOrigins = ["https://pluspointnews.netlify.app"];
+const allowedOrigins = ["https://pluspointnews.netlify.app", 'http://127.0.0.1:5500'];
 app.use(
   cors({
     origin: allowedOrigins,
@@ -80,6 +81,7 @@ app.use("/api/verify-mfa", authMiddleware, verifyMfaRoute(mfaCodes));
 app.use("/api", logoutRoutes);
 app.use("/api", deleteLocationRouter);
 app.use("/api", securityLogRouter);
+app.use('/api', AdminRoutes);
 app.use("/api/news", newsRoutes);
 
 // Health check route

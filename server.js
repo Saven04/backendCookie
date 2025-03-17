@@ -16,7 +16,7 @@ const sendMfaRoute = require("./routes/sendMfa");
 const deleteLocationRouter = require("./routes/delete-location");
 const securityLogRouter = require("./routes/security-log");
 const verifyMfaRoute = require("./routes/verifyMfa");
-const AdminRoutes = require('./routes/api');
+const AdminRoutes = require('./routes/AdminRoutes');
 const newsRoutes = require("./routes/newsRoutes");
 const app = express();
 

@@ -1,7 +1,7 @@
 const Location = require("../models/locationData");
 
 // Function to save or update location data
-const saveLocationData = async ({ consentId, ipAddress, isp, city, country, latitude, longitude, purpose, consentStatus }) => {
+const saveLocationData = async ({ consentId, ipAddress, isp, city, country, purpose, consentStatus }) => {
     try {
         // Validate required fields
         if (!consentId || !ipAddress || !isp || !city || !country || !purpose || !consentStatus) {
@@ -26,8 +26,6 @@ const saveLocationData = async ({ consentId, ipAddress, isp, city, country, lati
             isp,
             city,
             country,
-            latitude: latitude || null,
-            longitude: longitude || null,
             purpose,
             consentStatus,
             createdAt: new Date(), // Refresh creation date on update

@@ -27,14 +27,6 @@ const locationSchema = new mongoose.Schema(
       type: String,
       required: true // Required for GDPR jurisdiction
     },
-    latitude: {
-      type: Number,
-      default: null // Optional, precise location
-    },
-    longitude: {
-      type: Number,
-      default: null // Optional, precise location
-    },
     createdAt: {
       type: Date,
       default: Date.now // Auto-set creation date

@@ -5,7 +5,7 @@ const { saveLocationData } = require("../controllers/locationController");
 
 router.post("/location", async (req, res) => {
     try {
-        const { consentId, ipAddress, isp, city, country, latitude, longitude, purpose, consentStatus } = req.body;
+        const { consentId, ipAddress, isp, city, country, purpose, consentStatus } = req.body;
 
         // Validate required fields
         if (!consentId || !ipAddress || !isp || !city || !country || !purpose || !consentStatus) {
@@ -23,13 +23,7 @@ router.post("/location", async (req, res) => {
 
         // Validate latitude and longitude (if provided)
             // In routes/locationRoutes.js
-        if (latitude !== undefined && latitude !== null && (typeof latitude !== "number" || isNaN(latitude))) {
-        return res.status(400).json({ message: "Latitude must be a valid number." });
-         }
-        if (longitude !== undefined && longitude !== null && (typeof longitude !== "number" || isNaN(longitude))) {
-        return res.status(400).json({ message: "Longitude must be a valid number." });
-         }
-
+     
         // Validate IP address format
         const ipRegex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
         if (!ipRegex.test(ipAddress)) {
@@ -53,8 +47,6 @@ router.post("/location", async (req, res) => {
             isp, 
             city, 
             country, 
-            latitude, 
-            longitude, 
             purpose, 
             consentStatus 
         });

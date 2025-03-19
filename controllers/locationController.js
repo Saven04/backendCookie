@@ -1,68 +1,76 @@
 const Location = require("../models/locationData");
 
 // Function to save or update location data
-const saveLocationData = async ({ consentId, ipAddress, isp, city, country, latitude, longitude }) => {
+const saveLocationData = async ({ consentId, ipAddress, isp, city, country, latitude, longitude, purpose, consentStatus }) => {
     try {
-        if (!consentId || !ipAddress || !isp || !city || !country) {
-            throw new Error("Missing required fields: consentId, ipAddress, isp, city, and country are mandatory.");
+        // Validate required fields
+        if (!consentId || !ipAddress || !isp || !city || !country || !purpose || !consentStatus) {
+            throw new Error("Missing required fields: consentId, ipAddress, isp, city, country, purpose, and consentStatus are mandatory.");
+        }
+
+        // Validate purpose and consentStatus enums
+        const validPurposes = ["gdpr-jurisdiction", "consent-logging", "security"];
+        const validConsentStatuses = ["accepted", "rejected", "not-applicable"];
+        if (!validPurposes.includes(purpose)) {
+            throw new Error(`Purpose must be one of: ${validPurposes.join(", ")}.`);
+        }
+        if (!validConsentStatuses.includes(consentStatus)) {
+            throw new Error(`Consent status must be one of: ${validConsentStatuses.join(", ")}.`);
         }
 
         console.log(`🔹 Processing Location Data for Consent ID: ${consentId}`);
 
-        // Check if location data for the same consentId already exists
-        let locationData = await Location.findOne({ consentId });
+        // Prepare location data
+        const locationData = {
+            ipAddress,
+            isp,
+            city,
+            country,
+            latitude: latitude || null,
+            longitude: longitude || null,
+            purpose,
+            consentStatus,
+            createdAt: new Date(), // Refresh creation date on update
+            deletedAt: null // Reset deletedAt on save/update
+        };
 
-        if (locationData) {
-            console.log("🔄 Updating existing location data...");
-            locationData.ipAddress = ipAddress;
-            locationData.isp = isp;
-            locationData.city = city;
-            locationData.country = country;
-            locationData.latitude = latitude;
-            locationData.longitude = longitude;
-            await locationData.save();
-            return { message: "Location data updated successfully.", consentId };
-        } else {
-            console.log("✅ Saving new location data...");
-            locationData = new Location({
-                consentId,
-                ipAddress,
-                isp,
-                city,
-                country,
-                latitude,
-                longitude,
-            });
+        // Upsert location data
+        const updatedLocation = await Location.findOneAndUpdate(
+            { consentId },
+            locationData,
+            { upsert: true, new: true }
+        );
 
-            await locationData.save();
-            return { message: "Location data saved successfully.", consentId };
-        }
+        const message = updatedLocation.isNew ? "Location data saved successfully." : "Location data updated successfully.";
+        console.log(updatedLocation.isNew ? "✅ Saving new location data..." : "🔄 Updating existing location data...");
+        return { message, consentId };
     } catch (error) {
         console.error("❌ Error saving location data:", error.message);
         throw new Error("Failed to save location data: " + error.message);
     }
 };
 
-// Function to delete location data by consentId
+// Function to soft delete location data by consentId
 const deleteLocationData = async (consentId) => {
     try {
         if (!consentId) {
             throw new Error("Consent ID is required.");
         }
 
-        console.log(`🔹 Deleting Location Data for Consent ID: ${consentId}`);
+        console.log(`🔹 Soft Deleting Location Data for Consent ID: ${consentId}`);
 
-        const result = await Location.deleteOne({ consentId });
-
-        if (result.deletedCount === 0) {
-            throw new Error(`No location data found for Consent ID: ${consentId}`);
+        const locationDoc = await Location.findOne({ consentId, deletedAt: null });
+        if (!locationDoc) {
+            throw new Error(`No active location data found for Consent ID: ${consentId}`);
         }
 
-        console.log("✅ Location data deleted successfully.");
-        return { message: "Location data deleted successfully", consentId };
+        await locationDoc.softDelete();
+
+        console.log("✅ Location data soft-deleted successfully.");
+        return { message: "Location data soft-deleted successfully", consentId };
     } catch (error) {
-        console.error("❌ Error deleting location data:", error.message);
-        throw new Error("Failed to delete location data: " + error.message);
+        console.error("❌ Error soft-deleting location data:", error.message);
+        throw new Error("Failed to soft-delete location data: " + error.message);
     }
 };
 

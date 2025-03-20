@@ -25,7 +25,7 @@ const adminAuthMiddleware = async (req, res, next) => {
     }
 };
 // Admin login with email and password
-router.post("/admin/login", async (req, res) => {
+router.post("/login", async (req, res) => {
     const { email, password } = req.body;
     console.log("Login attempt:", { email, password }); // Debug log
 
@@ -203,7 +203,7 @@ router.get("/api/gdpr-data/:consentId", async (req, res) => {
 });
 
 // Logout
-router.post("/logout", async (req, res) => {
+router.post("/api/admin/logout", async (req, res) => {
     try {
         await AuditLog.create({
             adminId: req.adminId,

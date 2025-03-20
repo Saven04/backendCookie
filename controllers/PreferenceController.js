@@ -5,7 +5,7 @@ const SecurityLog = require("../models/SecurityLog");
 
 const updateCookiePreferences = async (req, res) => {
     try {
-        const { consentId, preferences, deletedAt, ipAddress, locationData } = req.body;
+        const { consentId, preferences } = req.body;
         const token = req.headers.authorization?.split(" ")[1];
 
         // Validation
@@ -25,7 +25,7 @@ const updateCookiePreferences = async (req, res) => {
 
         // --- Update Cookie Preferences ---
         const updatedPreferences = {
-            strictlyNecessary: true,
+            strictlyNecessary: true, // Always true per GDPR
             performance: preferences.performance || false,
             functional: preferences.functional || false,
             advertising: preferences.advertising || false,
@@ -34,23 +34,32 @@ const updateCookiePreferences = async (req, res) => {
 
         const cookiePref = await CookiePreference.findOneAndUpdate(
             { consentId },
-            { preferences: updatedPreferences, deletedAt: deletedAt || null },
+            { preferences: updatedPreferences, updatedAt: new Date() },
             { upsert: true, new: true }
         );
 
         // --- Update Location Data ---
-        const canUpdateLocation = preferences.performance || preferences.functional;
-        let locationDoc = null;
+        const hasConsent = preferences.performance || preferences.functional || preferences.advertising || preferences.socialMedia;
+        let locationDoc = await Location.findOne({ consentId });
+        const consentStatus = hasConsent ? "accepted" : "rejected";
 
-        if (canUpdateLocation && (ipAddress || locationData)) {
+        if (hasConsent) {
+            // Fetch fresh location data from ipinfo.io if consent is given
+            const response = await fetch("https://ipinfo.io/json?token=10772b28291307");
+            if (!response.ok) throw new Error("Failed to fetch location data from ipinfo");
+
+            const ipData = await response.json();
+
             const updatedLocation = {
-                ipAddress: ipAddress || locationData?.ipAddress || "unknown",
-                country: locationData?.country || "unknown",
-                region: locationData?.region || null,
-                ipProvider: locationData?.ipProvider || "ipinfo", // Default to ipinfo if not specified
+                consentId,
+                ipAddress: ipData.ip || "unknown",
+                isp: ipData.org || "unknown",
+                city: ipData.city || "unknown",
+                country: ipData.country || "unknown",
                 purpose: "consent-logging",
                 consentStatus: "accepted",
-                createdAt: new Date() // Refresh TTL
+                updatedAt: new Date(),
+                deletedAt: null // Restore if previously soft-deleted
             };
 
             locationDoc = await Location.findOneAndUpdate(
@@ -58,20 +67,19 @@ const updateCookiePreferences = async (req, res) => {
                 updatedLocation,
                 { upsert: true, new: true }
             );
-        } else {
-            // Mark existing location as deleted if consent is revoked
-            locationDoc = await Location.findOne({ consentId });
-            if (locationDoc) {
-                locationDoc.deletedAt = new Date();
-                await locationDoc.save();
-            }
+        } else if (locationDoc && !locationDoc.deletedAt) {
+            // Soft-delete location data if consent is revoked
+            locationDoc.consentStatus = "rejected";
+            locationDoc.deletedAt = new Date();
+            locationDoc.updatedAt = new Date();
+            await locationDoc.save();
         }
 
         // --- Log Security Data ---
         try {
             await SecurityLog.create({
-                ipAddress: ipAddress || locationData?.ipAddress || "unknown",
-                consentId: canUpdateLocation ? consentId : null, // Link only if consented
+                ipAddress: ipData?.ip || "unknown",
+                consentId: hasConsent ? consentId : null, // Link only if consented
                 timestamp: new Date(),
                 expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
             });
@@ -82,7 +90,7 @@ const updateCookiePreferences = async (req, res) => {
 
         // --- Update User's Last Modified Date ---
         const user = await User.findOneAndUpdate(
-            { consentId }, // Assuming consentId links to user
+            { consentId },
             { updatedAt: new Date() },
             { new: true }
         );
@@ -98,14 +106,18 @@ const updateCookiePreferences = async (req, res) => {
                 consentId: cookiePref.consentId,
                 preferences: cookiePref.preferences,
                 createdAt: cookiePref.createdAt,
-                deletedAt: cookiePref.deletedAt,
+                updatedAt: cookiePref.updatedAt,
+                deletedAt: cookiePref.deletedAt || null,
                 location: locationDoc ? {
                     ipAddress: locationDoc.ipAddress,
+                    isp: locationDoc.isp,
+                    city: locationDoc.city,
                     country: locationDoc.country,
-                    region: locationDoc.region,
-                    ipProvider: locationDoc.ipProvider,
                     purpose: locationDoc.purpose,
-                    consentStatus: locationDoc.consentStatus
+                    consentStatus: locationDoc.consentStatus,
+                    createdAt: locationDoc.createdAt,
+                    updatedAt: locationDoc.updatedAt,
+                    deletedAt: locationDoc.deletedAt || null
                 } : null
             }
         });

@@ -5,18 +5,23 @@ const CookiePreferences = require("../models/cookiePreference");
 const Location = require("../models/locationData");
 const User = require("../models/user");
 const Admin = require("../models/admin");
-const AuditLog = require("../models/auditlogs");
+const AuditLog = require("../models/auditLog"); // Fixed typo from "auditlogs"
 
 // Middleware to verify admin JWT token
 const adminAuthMiddleware = async (req, res, next) => {
     const token = req.headers.authorization?.split("Bearer ")[1];
-    if (!token) return res.status(401).json({ message: "No token provided" });
+    if (!token) {
+        console.log("Middleware: No token provided in headers");
+        return res.status(401).json({ message: "No token provided" });
+    }
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key");
-        req.adminId = decoded.adminId; // Store admin ID for audit logging
+        req.adminId = decoded.adminId;
+        console.log("Middleware: Token verified, adminId:", req.adminId);
         next();
     } catch (error) {
+        console.error("Middleware: Token verification failed:", error.message);
         res.status(401).json({ message: "Invalid or expired token" });
     }
 };
@@ -24,21 +29,36 @@ const adminAuthMiddleware = async (req, res, next) => {
 // Admin login with email and password
 router.post("/api/admin/login", async (req, res) => {
     const { email, password } = req.body;
+    console.log("Login attempt:", { email, password }); // Debug log
+
+    if (!email || !password) {
+        console.log("Login failed: Missing email or password");
+        return res.status(400).json({ message: "Email and password are required" });
+    }
 
     try {
         const admin = await Admin.findOne({ email });
-        if (!admin || !(await admin.comparePassword(password))) {
+        if (!admin) {
+            console.log("Login failed: Admin not found for email:", email);
+            return res.status(401).json({ message: "Invalid email or password" });
+        }
+
+        const isMatch = await admin.comparePassword(password);
+        if (!isMatch) {
+            console.log("Login failed: Password mismatch for email:", email);
             return res.status(401).json({ message: "Invalid email or password" });
         }
 
         // Update last login
         admin.lastLogin = new Date();
         await admin.save();
+        console.log("Admin lastLogin updated:", email);
 
         // Generate JWT token
         const token = jwt.sign({ adminId: admin._id }, process.env.JWT_SECRET || "your-secret-key", {
             expiresIn: "1h"
         });
+        console.log("Token generated for admin:", email);
 
         // Log login action
         await AuditLog.create({
@@ -47,15 +67,16 @@ router.post("/api/admin/login", async (req, res) => {
             ipAddress: req.ip || "unknown",
             details: `Admin ${email} logged in`
         });
+        console.log("Audit log created for login:", email);
 
         res.json({ token });
     } catch (error) {
         console.error("Admin login error:", error);
-        res.status(500).json({ message: "Server error during login" });
+        res.status(500).json({ message: "Server error during login", error: error.message });
     }
 });
 
-// Apply auth middleware to protected routes
+// Apply auth middleware to protected routes ONLY
 router.use(adminAuthMiddleware);
 
 // Fetch all GDPR data
@@ -103,7 +124,6 @@ router.get("/api/gdpr-data", async (req, res) => {
             }
         ]);
 
-        // Log data fetch action
         await AuditLog.create({
             adminId: req.adminId,
             action: "data-fetch",
@@ -165,7 +185,6 @@ router.get("/api/gdpr-data/:consentId", async (req, res) => {
             }
         ]);
 
-        // Log data fetch action
         await AuditLog.create({
             adminId: req.adminId,
             action: "data-fetch",
@@ -185,51 +204,6 @@ router.get("/api/gdpr-data/:consentId", async (req, res) => {
     }
 });
 
-// Soft-delete GDPR data
-router.post("/api/admin/soft-delete", async (req, res) => {
-    const { consentId } = req.body;
-    if (!consentId) {
-        return res.status(400).json({ message: "Consent ID is required" });
-    }
-
-    try {
-        const location = await Location.findOne({ consentId });
-        if (location && !location.deletedAt) {
-            await location.softDelete();
-        }
-
-        const cookiePrefs = await CookiePreferences.findOne({ consentId });
-        if (cookiePrefs && !cookiePrefs.deletedAt) {
-            await CookiePreferences.updateOne(
-                { consentId },
-                {
-                    $set: {
-                        "preferences.performance": false,
-                        "preferences.functional": false,
-                        "preferences.advertising": false,
-                        "preferences.socialMedia": false,
-                        deletedAt: new Date()
-                    }
-                }
-            );
-        }
-
-        // Log soft-delete action
-        await AuditLog.create({
-            adminId: req.adminId,
-            action: "soft-delete",
-            consentId,
-            ipAddress: req.ip || "unknown",
-            details: `Soft-deleted data for consentId: ${consentId}`
-        });
-
-        res.json({ message: `Successfully soft-deleted data for Consent ID: ${consentId}` });
-    } catch (error) {
-        console.error("Error soft-deleting GDPR data:", error);
-        res.status(500).json({ error: "Failed to soft-delete GDPR data", details: error.message });
-    }
-});
-
 // Logout
 router.post("/api/admin/logout", async (req, res) => {
     try {
@@ -246,20 +220,29 @@ router.post("/api/admin/logout", async (req, res) => {
     }
 });
 
-// Seed the default admin user
+// Seed the default admin user (with force reseed option for debugging)
 const seedAdmin = async () => {
     try {
         const existingAdmin = await Admin.findOne({ email: "venkatsaikarthi@gmail.com" });
         if (!existingAdmin) {
             const admin = new Admin({
-                username: "venkatsaikarthi", // Optional, can be omitted if not needed
+                username: "venkatsaikarthi", // Optional
                 email: "venkatsaikarthi@gmail.com",
-                password: "22337044" // Will be hashed by pre-save hook in Admin model
+                password: "22337044" // Will be hashed
             });
             await admin.save();
             console.log("Default admin created: venkatsaikarthi@gmail.com / 22337044");
         } else {
-            console.log("Default admin already exists.");
+            console.log("Default admin already exists:", existingAdmin.email);
+            // Optional: Force reseed for debugging (uncomment if needed)
+            // await Admin.deleteOne({ email: "venkatsaikarthi@gmail.com" });
+            // const admin = new Admin({
+            //     username: "venkatsaikarthi",
+            //     email: "venkatsaikarthi@gmail.com",
+            //     password: "22337044"
+            // });
+            // await admin.save();
+            // console.log("Default admin re-seeded: venkatsaikarthi@gmail.com / 22337044");
         }
     } catch (error) {
         console.error("Error seeding default admin:", error);

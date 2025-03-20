@@ -97,8 +97,8 @@ app.use("/api/admin/", adminRoutes); // Isolated admin routes
 app.use("/api", cookieRoutes); // More specific paths
 app.use("/api", locationRoutes);
 app.use("/api", authRoutes);
-app.use("/api", authMiddleware, sendMfaRoute(mfaCodes));
-app.use("/api", authMiddleware, verifyMfaRoute(mfaCodes));
+app.use("/api/send-mfa", authMiddleware, sendMfaRoute(mfaCodes));
+app.use("/api/verify-mfa", authMiddleware, verifyMfaRoute(mfaCodes));
 app.use("/api", logoutRoutes);
 app.use("/api", deleteLocationRouter);
 app.use("/api", securityLogRouter);

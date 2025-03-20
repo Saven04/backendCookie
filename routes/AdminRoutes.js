@@ -203,7 +203,7 @@ router.get("/api/gdpr-data/:consentId", async (req, res) => {
 });
 
 // Logout
-router.post("/api/admin/logout", async (req, res) => {
+router.post("/logout", async (req, res) => {
     try {
         await AuditLog.create({
             adminId: req.adminId,

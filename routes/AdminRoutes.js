@@ -4,7 +4,20 @@ const CookiePreferences = require("../models/cookiePreference");
 const Location = require("../models/locationData");
 const User = require("../models/user");
 
-router.get("/gdpr-data", async (req, res) => {
+// Middleware to ensure admin access (example, adjust based on your setup)
+const adminAuthMiddleware = (req, res, next) => {
+    const token = req.headers.authorization?.split("Bearer ")[1];
+    if (!token || token !== process.env.ADMIN_TOKEN) { // Replace with your auth logic
+        return res.status(401).json({ message: "Unauthorized: Admin access required" });
+    }
+    next();
+};
+
+// Apply admin authentication to all routes
+router.use(adminAuthMiddleware);
+
+// Fetch all GDPR data
+router.get("/api/gdpr-data", async (req, res) => {
     try {
         const data = await CookiePreferences.aggregate([
             {
@@ -29,7 +42,8 @@ router.get("/gdpr-data", async (req, res) => {
                     preferences: 1,
                     "timestamps.cookiePreferences": {
                         createdAt: "$createdAt",
-                        updatedAt: "$updatedAt"
+                        updatedAt: "$updatedAt",
+                        deletedAt: "$deletedAt" // Include deletedAt for CookiePreferences
                     },
                     ipAddress: { $arrayElemAt: ["$location.ipAddress", 0] },
                     isp: { $arrayElemAt: ["$location.isp", 0] },
@@ -47,18 +61,15 @@ router.get("/gdpr-data", async (req, res) => {
             }
         ]);
 
-        if (data.length === 0) {
-            return res.json([]); // Return empty array if no data
-        }
-
-        res.json(data);
+        res.json(data.length === 0 ? [] : data);
     } catch (error) {
         console.error("Error fetching GDPR data:", error);
         res.status(500).json({ error: "Failed to fetch GDPR data", details: error.message });
     }
 });
 
-router.get("/gdpr-data/:consentId", async (req, res) => {
+// Fetch GDPR data by consentId
+router.get("/api/gdpr-data/:consentId", async (req, res) => {
     const { consentId } = req.params;
     try {
         const data = await CookiePreferences.aggregate([
@@ -85,7 +96,8 @@ router.get("/gdpr-data/:consentId", async (req, res) => {
                     preferences: 1,
                     "timestamps.cookiePreferences": {
                         createdAt: "$createdAt",
-                        updatedAt: "$updatedAt"
+                        updatedAt: "$updatedAt",
+                        deletedAt: "$deletedAt"
                     },
                     ipAddress: { $arrayElemAt: ["$location.ipAddress", 0] },
                     isp: { $arrayElemAt: ["$location.isp", 0] },
@@ -114,16 +126,37 @@ router.get("/gdpr-data/:consentId", async (req, res) => {
     }
 });
 
-// Optional: Add DELETE endpoint if not already in locationRoutes.js
-router.delete("/gdpr-data/:consentId", async (req, res) => {
-    const { consentId } = req.params;
+// Soft-delete GDPR data (used by dashboard.js)
+router.post("/api/admin/soft-delete", async (req, res) => {
+    const { consentId } = req.body;
+    if (!consentId) {
+        return res.status(400).json({ message: "Consent ID is required" });
+    }
+
     try {
-        const location = await Location.findOne({ consentId, deletedAt: null });
-        if (!location) {
-            return res.status(404).json({ message: "Location data not found or already deleted" });
+        // Soft-delete Location
+        const location = await Location.findOne({ consentId });
+        if (location && !location.deletedAt) {
+            await location.softDelete();
         }
 
-        await location.softDelete();
+        // Soft-delete CookiePreferences
+        const cookiePrefs = await CookiePreferences.findOne({ consentId });
+        if (cookiePrefs && !cookiePrefs.deletedAt) {
+            await CookiePreferences.updateOne(
+                { consentId },
+                {
+                    $set: {
+                        "preferences.performance": false,
+                        "preferences.functional": false,
+                        "preferences.advertising": false,
+                        "preferences.socialMedia": false,
+                        deletedAt: new Date()
+                    }
+                }
+            );
+        }
+
         res.json({ message: `Successfully soft-deleted data for Consent ID: ${consentId}` });
     } catch (error) {
         console.error("Error soft-deleting GDPR data:", error);

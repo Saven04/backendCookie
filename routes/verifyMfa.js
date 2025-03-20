@@ -1,4 +1,3 @@
-// routes/verifyMfa.js
 const express = require("express");
 const router = express.Router();
 const CookiePreferences = require("../models/cookiePreference");
@@ -33,7 +32,7 @@ router.post("/", authMiddleware, async (req, res) => {
     try {
         const deletedAt = new Date();
 
-        // Update CookiePreferences
+        // Update CookiePreferences (soft delete by disabling optional preferences)
         const cookieUpdateResult = await CookiePreferences.updateOne(
             { consentId: consentId },
             {
@@ -42,7 +41,8 @@ router.post("/", authMiddleware, async (req, res) => {
                     "preferences.functional": false,
                     "preferences.advertising": false,
                     "preferences.socialMedia": false,
-                    deletedAt: deletedAt
+                    deletedAt: deletedAt,
+                    updatedAt: deletedAt // Align with timestamps
                 }
             }
         );
@@ -51,30 +51,28 @@ router.post("/", authMiddleware, async (req, res) => {
             console.warn(`No CookiePreferences found for consentId: ${consentId}`);
         }
 
-        // Update Location
-        const locationUpdateResult = await Location.updateOne(
-            { consentId: consentId },
-            {
-                $set: { deletedAt: deletedAt }
+        // Soft delete Location data using the model's method
+        let locationDoc = await Location.findOne({ consentId: consentId });
+        if (locationDoc) {
+            if (!locationDoc.deletedAt) {
+                await locationDoc.softDelete(); // Uses model's softDelete method
             }
-        );
-
-        if (locationUpdateResult.matchedCount === 0) {
+        } else {
             console.warn(`No Location data found for consentId: ${consentId}`);
         }
 
         // Clear the MFA code
         mfaCodes.delete(user._id.toString());
 
-        res.status(200).json({ message: "Data deleted successfully" });
+        res.status(200).json({ message: "Data soft-deleted successfully" });
     } catch (error) {
-        console.error("Error deleting data:", {
+        console.error("Error soft-deleting data:", {
             message: error.message,
             stack: error.stack,
             consentId: consentId,
             userId: user._id
         });
-        res.status(500).json({ message: "Failed to delete data due to server error" });
+        res.status(500).json({ message: "Failed to soft-delete data due to server error" });
     }
 });
 

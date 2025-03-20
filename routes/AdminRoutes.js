@@ -1,19 +1,61 @@
 const express = require("express");
 const router = express.Router();
+const jwt = require("jsonwebtoken");
 const CookiePreferences = require("../models/cookiePreference");
 const Location = require("../models/locationData");
 const User = require("../models/user");
+const Admin = require("../models/admin");
+const AuditLog = require("../models/auditLog");
 
-// Middleware to ensure admin access (example, adjust based on your setup)
-const adminAuthMiddleware = (req, res, next) => {
+// Middleware to verify admin JWT token
+const adminAuthMiddleware = async (req, res, next) => {
     const token = req.headers.authorization?.split("Bearer ")[1];
-    if (!token || token !== process.env.ADMIN_TOKEN) { // Replace with your auth logic
-        return res.status(401).json({ message: "Unauthorized: Admin access required" });
+    if (!token) return res.status(401).json({ message: "No token provided" });
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key");
+        req.adminId = decoded.adminId; // Store admin ID for audit logging
+        next();
+    } catch (error) {
+        res.status(401).json({ message: "Invalid or expired token" });
     }
-    next();
 };
 
-// Apply admin authentication to all routes
+// Admin login
+router.post("/api/admin/login", async (req, res) => {
+    const { username, password } = req.body;
+
+    try {
+        const admin = await Admin.findOne({ username });
+        if (!admin || !(await admin.comparePassword(password))) {
+            return res.status(401).json({ message: "Invalid username or password" });
+        }
+
+        // Update last login
+        admin.lastLogin = new Date();
+        await admin.save();
+
+        // Generate JWT token
+        const token = jwt.sign({ adminId: admin._id }, process.env.JWT_SECRET || "your-secret-key", {
+            expiresIn: "1h"
+        });
+
+        // Log login action
+        await AuditLog.create({
+            adminId: admin._id,
+            action: "login",
+            ipAddress: req.ip || "unknown",
+            details: `Admin ${username} logged in`
+        });
+
+        res.json({ token });
+    } catch (error) {
+        console.error("Admin login error:", error);
+        res.status(500).json({ message: "Server error during login" });
+    }
+});
+
+// Apply auth middleware to protected routes
 router.use(adminAuthMiddleware);
 
 // Fetch all GDPR data
@@ -43,7 +85,7 @@ router.get("/api/gdpr-data", async (req, res) => {
                     "timestamps.cookiePreferences": {
                         createdAt: "$createdAt",
                         updatedAt: "$updatedAt",
-                        deletedAt: "$deletedAt" // Include deletedAt for CookiePreferences
+                        deletedAt: "$deletedAt"
                     },
                     ipAddress: { $arrayElemAt: ["$location.ipAddress", 0] },
                     isp: { $arrayElemAt: ["$location.isp", 0] },
@@ -60,6 +102,14 @@ router.get("/api/gdpr-data", async (req, res) => {
                 }
             }
         ]);
+
+        // Log data fetch action
+        await AuditLog.create({
+            adminId: req.adminId,
+            action: "data-fetch",
+            ipAddress: req.ip || "unknown",
+            details: "Fetched all GDPR data"
+        });
 
         res.json(data.length === 0 ? [] : data);
     } catch (error) {
@@ -115,6 +165,15 @@ router.get("/api/gdpr-data/:consentId", async (req, res) => {
             }
         ]);
 
+        // Log data fetch action
+        await AuditLog.create({
+            adminId: req.adminId,
+            action: "data-fetch",
+            consentId,
+            ipAddress: req.ip || "unknown",
+            details: `Fetched GDPR data for consentId: ${consentId}`
+        });
+
         if (data.length > 0) {
             res.json(data[0]);
         } else {
@@ -126,7 +185,65 @@ router.get("/api/gdpr-data/:consentId", async (req, res) => {
     }
 });
 
+// Soft-delete GDPR data
+router.post("/api/admin/soft-delete", async (req, res) => {
+    const { consentId } = req.body;
+    if (!consentId) {
+        return res.status(400).json({ message: "Consent ID is required" });
+    }
 
+    try {
+        const location = await Location.findOne({ consentId });
+        if (location && !location.deletedAt) {
+            await location.softDelete();
+        }
 
+        const cookiePrefs = await CookiePreferences.findOne({ consentId });
+        if (cookiePrefs && !cookiePrefs.deletedAt) {
+            await CookiePreferences.updateOne(
+                { consentId },
+                {
+                    $set: {
+                        "preferences.performance": false,
+                        "preferences.functional": false,
+                        "preferences.advertising": false,
+                        "preferences.socialMedia": false,
+                        deletedAt: new Date()
+                    }
+                }
+            );
+        }
+
+        // Log soft-delete action
+        await AuditLog.create({
+            adminId: req.adminId,
+            action: "soft-delete",
+            consentId,
+            ipAddress: req.ip || "unknown",
+            details: `Soft-deleted data for consentId: ${consentId}`
+        });
+
+        res.json({ message: `Successfully soft-deleted data for Consent ID: ${consentId}` });
+    } catch (error) {
+        console.error("Error soft-deleting GDPR data:", error);
+        res.status(500).json({ error: "Failed to soft-delete GDPR data", details: error.message });
+    }
+});
+
+// Logout (optional, if you want server-side logout tracking)
+router.post("/api/admin/logout", async (req, res) => {
+    try {
+        await AuditLog.create({
+            adminId: req.adminId,
+            action: "logout",
+            ipAddress: req.ip || "unknown",
+            details: "Admin logged out"
+        });
+        res.json({ message: "Logged out successfully" });
+    } catch (error) {
+        console.error("Error logging out:", error);
+        res.status(500).json({ message: "Logout failed" });
+    }
+});
 
 module.exports = router;

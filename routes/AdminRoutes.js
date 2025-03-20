@@ -126,42 +126,7 @@ router.get("/api/gdpr-data/:consentId", async (req, res) => {
     }
 });
 
-// Soft-delete GDPR data (used by dashboard.js)
-router.post("/api/admin/soft-delete", async (req, res) => {
-    const { consentId } = req.body;
-    if (!consentId) {
-        return res.status(400).json({ message: "Consent ID is required" });
-    }
 
-    try {
-        // Soft-delete Location
-        const location = await Location.findOne({ consentId });
-        if (location && !location.deletedAt) {
-            await location.softDelete();
-        }
 
-        // Soft-delete CookiePreferences
-        const cookiePrefs = await CookiePreferences.findOne({ consentId });
-        if (cookiePrefs && !cookiePrefs.deletedAt) {
-            await CookiePreferences.updateOne(
-                { consentId },
-                {
-                    $set: {
-                        "preferences.performance": false,
-                        "preferences.functional": false,
-                        "preferences.advertising": false,
-                        "preferences.socialMedia": false,
-                        deletedAt: new Date()
-                    }
-                }
-            );
-        }
-
-        res.json({ message: `Successfully soft-deleted data for Consent ID: ${consentId}` });
-    } catch (error) {
-        console.error("Error soft-deleting GDPR data:", error);
-        res.status(500).json({ error: "Failed to soft-delete GDPR data", details: error.message });
-    }
-});
 
 module.exports = router;

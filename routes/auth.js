@@ -22,7 +22,7 @@ function getClientIp(req) {
 }
 
 // POST /api/register - Register a new user
-router.post("/api/register", async (req, res) => {
+router.post("/register", async (req, res) => {
     try {
         const { username, email, password, consentId, preferences } = req.body;
 
@@ -160,7 +160,7 @@ router.post("/api/register", async (req, res) => {
 });
 
 // POST /api/login - Authenticate a user
-router.post("/api/login", async (req, res) => {
+router.post("/login", async (req, res) => {
     try {
         const { email, password } = req.body;
 

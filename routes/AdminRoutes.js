@@ -5,7 +5,7 @@ const CookiePreferences = require("../models/cookiePreference");
 const Location = require("../models/locationData");
 const User = require("../models/user");
 const Admin = require("../models/admin");
-const AuditLog = require("../models/auditLog"); // Fixed typo: "auditlogs" to "auditLog"
+const AuditLog = require("../models/auditlogs");
 
 // Middleware to verify admin JWT token
 const adminAuthMiddleware = async (req, res, next) => {

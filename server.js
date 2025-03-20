@@ -20,7 +20,7 @@ const newsRoutes = require("./routes/newsRoutes");
 
 // Load models (optional, already required in routes)
 require("./models/admin");
-require("./models/auditLog"); // Fixed typo from "auditlogs" to match adminRoutes.js
+require("./models/auditlogs"); // Fixed typo from "auditlogs" to match adminRoutes.js
 
 const app = express();
 

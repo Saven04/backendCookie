@@ -5,7 +5,7 @@ const CookiePreferences = require("../models/cookiePreference");
 const Location = require("../models/locationData");
 const User = require("../models/user");
 const Admin = require("../models/admin");
-const AuditLog = require("../models/auditlogs");
+const AuditLog = require("../models/auditLog"); // Fixed typo: "auditlogs" to "auditLog"
 
 // Middleware to verify admin JWT token
 const adminAuthMiddleware = async (req, res, next) => {
@@ -21,14 +21,14 @@ const adminAuthMiddleware = async (req, res, next) => {
     }
 };
 
-// Admin login
+// Admin login with email and password
 router.post("/api/admin/login", async (req, res) => {
-    const { username, password } = req.body;
+    const { email, password } = req.body;
 
     try {
-        const admin = await Admin.findOne({ username });
+        const admin = await Admin.findOne({ email });
         if (!admin || !(await admin.comparePassword(password))) {
-            return res.status(401).json({ message: "Invalid username or password" });
+            return res.status(401).json({ message: "Invalid email or password" });
         }
 
         // Update last login
@@ -45,7 +45,7 @@ router.post("/api/admin/login", async (req, res) => {
             adminId: admin._id,
             action: "login",
             ipAddress: req.ip || "unknown",
-            details: `Admin ${username} logged in`
+            details: `Admin ${email} logged in`
         });
 
         res.json({ token });
@@ -230,7 +230,7 @@ router.post("/api/admin/soft-delete", async (req, res) => {
     }
 });
 
-// Logout (optional, if you want server-side logout tracking)
+// Logout
 router.post("/api/admin/logout", async (req, res) => {
     try {
         await AuditLog.create({
@@ -245,5 +245,26 @@ router.post("/api/admin/logout", async (req, res) => {
         res.status(500).json({ message: "Logout failed" });
     }
 });
+
+// Seed the default admin user
+const seedAdmin = async () => {
+    try {
+        const existingAdmin = await Admin.findOne({ email: "venkatsaikarthi@gmail.com" });
+        if (!existingAdmin) {
+            const admin = new Admin({
+                username: "venkatsaikarthi", // Optional, can be omitted if not needed
+                email: "venkatsaikarthi@gmail.com",
+                password: "22337044" // Will be hashed by pre-save hook in Admin model
+            });
+            await admin.save();
+            console.log("Default admin created: venkatsaikarthi@gmail.com / 22337044");
+        } else {
+            console.log("Default admin already exists.");
+        }
+    } catch (error) {
+        console.error("Error seeding default admin:", error);
+    }
+};
+seedAdmin();
 
 module.exports = router;

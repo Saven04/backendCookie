@@ -93,14 +93,14 @@ connectDB();
 const mfaCodes = new Map();
 
 // Routes (Order matters: Admin routes first to avoid overlap)
-app.use("/api", adminRoutes); // Isolated admin routes
+app.use("/api/admin/", adminRoutes); // Isolated admin routes
 app.use("/api", cookieRoutes); // More specific paths
 app.use("/api", locationRoutes);
 app.use("/api", authRoutes);
 app.use("/api", authMiddleware, sendMfaRoute(mfaCodes));
 app.use("/api", authMiddleware, verifyMfaRoute(mfaCodes));
 app.use("/api", logoutRoutes);
-app.use("/apin", deleteLocationRouter);
+app.use("/api", deleteLocationRouter);
 app.use("/api", securityLogRouter);
 app.use("/api/news", newsRoutes);
 

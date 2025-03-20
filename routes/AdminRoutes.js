@@ -25,7 +25,7 @@ const adminAuthMiddleware = async (req, res, next) => {
     }
 };
 // Admin login with email and password
-router.post("/login", async (req, res) => {
+router.post("/admin/login", async (req, res) => {
     const { email, password } = req.body;
     console.log("Login attempt:", { email, password }); // Debug log
 

@@ -14,7 +14,6 @@ const adminAuthMiddleware = async (req, res, next) => {
         console.log("Middleware: No token provided in headers");
         return res.status(401).json({ message: "No token provided" });
     }
-
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key");
         req.adminId = decoded.adminId;
@@ -25,9 +24,8 @@ const adminAuthMiddleware = async (req, res, next) => {
         res.status(401).json({ message: "Invalid or expired token" });
     }
 };
-
 // Admin login with email and password
-router.post("/api/admin/login", async (req, res) => {
+router.post("/login", async (req, res) => {
     const { email, password } = req.body;
     console.log("Login attempt:", { email, password }); // Debug log
 
@@ -80,7 +78,7 @@ router.post("/api/admin/login", async (req, res) => {
 router.use(adminAuthMiddleware);
 
 // Fetch all GDPR data
-router.get("/api/gdpr-data", async (req, res) => {
+router.get("/gdpr-data", async (req, res) => {
     try {
         const data = await CookiePreferences.aggregate([
             {

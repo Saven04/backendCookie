@@ -15,18 +15,18 @@ const sendMfaRoute = require("./routes/sendMfa");
 const deleteLocationRouter = require("./routes/delete-location");
 const securityLogRouter = require("./routes/security-log");
 const verifyMfaRoute = require("./routes/verifyMfa");
-const adminRoutes = require("./routes/AdminRoutes"); // Updated to lowercase for consistency
+const adminRoutes = require("./routes/AdminRoutes"); // Consistent casing
 const newsRoutes = require("./routes/newsRoutes");
 
-// Load new models
+// Load models (optional, already required in routes)
 require("./models/admin");
-require("./models/auditlogs");
+require("./models/auditLog"); // Fixed typo from "auditlogs" to match adminRoutes.js
 
 const app = express();
 
 // Middleware
 app.use(express.json());
-app.use(express.urlencoded({ extended: true })); // For form data if needed
+app.use(express.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(requestIp.mw()); // Capture client IP
 
@@ -34,8 +34,8 @@ app.use(requestIp.mw()); // Capture client IP
 const allowedOrigins = [
     "https://pluspointnews.netlify.app",
     "http://127.0.0.1:5500",
-    "http://localhost:5500", // Add local dev for dashboard if needed
-    // Add your dashboard frontend URL here, e.g., "https://gdpr-dashboard.netlify.app"
+    "http://localhost:5500",
+    // Add your dashboard frontend URL, e.g., "https://gdpr-dashboard.netlify.app"
 ];
 app.use(
     cors({
@@ -55,17 +55,23 @@ app.use(
 // Session Configuration
 app.use(
     session({
-        secret: process.env.SESSION_SECRET || "your-default-secret", // Ensure this is set in .env
+        secret: process.env.SESSION_SECRET || "your-default-secret",
         resave: false,
-        saveUninitialized: false, // Changed to false to avoid unnecessary sessions
+        saveUninitialized: false,
         cookie: {
-            secure: process.env.NODE_ENV === "production", // Secure in production
+            secure: process.env.NODE_ENV === "production",
             httpOnly: true,
             sameSite: "strict",
             maxAge: 24 * 60 * 60 * 1000, // 24 hours
         },
     })
 );
+
+// Debug Middleware to Log Requests
+app.use((req, res, next) => {
+    console.log(`Request: ${req.method} ${req.path}`);
+    next();
+});
 
 // MongoDB Connection
 const connectDB = async () => {
@@ -83,22 +89,22 @@ const connectDB = async () => {
 };
 connectDB();
 
-// MFA Codes Map (unchanged)
+// MFA Codes Map
 const mfaCodes = new Map();
 
-// Routes
-app.use("/api", cookieRoutes);
-app.use("/api", locationRoutes);
-app.use("/api", authRoutes);
+// Routes (Order matters: Admin routes first to avoid overlap)
+app.use("/api/admin", adminRoutes); // Isolated admin routes
+app.use("/api/cookies", cookieRoutes); // More specific paths
+app.use("/api/location", locationRoutes);
+app.use("/api/auth", authRoutes);
 app.use("/api/send-mfa", authMiddleware, sendMfaRoute(mfaCodes));
 app.use("/api/verify-mfa", authMiddleware, verifyMfaRoute(mfaCodes));
-app.use("/api", logoutRoutes);
-app.use("/api", deleteLocationRouter);
-app.use("/api", securityLogRouter);
-app.use("/api", adminRoutes); // Use lowercase for consistency
+app.use("/api/logout", logoutRoutes);
+app.use("/api/delete-location", deleteLocationRouter);
+app.use("/api/security-log", securityLogRouter);
 app.use("/api/news", newsRoutes);
 
-// Serve static frontend files (e.g., dashboard and login)
+// Serve static frontend files
 app.use(express.static(path.join(__dirname, "public")));
 
 // Health check route

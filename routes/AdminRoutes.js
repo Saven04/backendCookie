@@ -11,45 +11,49 @@ const AuditLog = require('../models/auditlogs');
 const adminAuthMiddleware = async (req, res, next) => {
     const token = req.headers.authorization?.split('Bearer ')[1];
     if (!token) {
-        console.log('Middleware: No token provided in headers');
-        return res.status(401).json({ message: 'No token provided' });
+        console.log('Middleware: No token provided in headers', { method: req.method, path: req.path });
+        return res.status(401).json({ message: 'No token provided', error: 'Authentication required' });
     }
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
         req.adminId = decoded.adminId;
-        console.log('Middleware: Token verified, adminId:', req.adminId);
+        console.log('Middleware: Token verified', { adminId: req.adminId, path: req.path });
         next();
     } catch (error) {
-        console.error('Middleware: Token verification failed:', error.message);
-        res.status(401).json({ message: 'Invalid or expired token' });
+        console.error('Middleware: Token verification failed', { error: error.message, path: req.path });
+        return res.status(401).json({ message: 'Invalid or expired token', error: error.message });
     }
 };
 
 // Admin login
 router.post('/loginAdmin', async (req, res) => {
     const { email, password } = req.body;
-    console.log('Login attempt:', { email, password });
+    console.log('Login attempt', { email });
 
     if (!email || !password) {
-        console.log('Login failed: Missing email or password');
-        return res.status(400).json({ message: 'Email and password are required' });
+        console.log('Login failed: Missing credentials', { email });
+        return res.status(400).json({ message: 'Email and password are required', error: 'Bad Request' });
     }
 
     try {
         const admin = await Admin.findOne({ email });
-        if (!admin || !(await admin.comparePassword(password))) {
-            console.log('Login failed: Invalid credentials for email:', email);
-            return res.status(401).json({ message: 'Invalid email or password' });
+        if (!admin) {
+            console.log('Login failed: Admin not found', { email });
+            return res.status(401).json({ message: 'Invalid email or password', error: 'Unauthorized' });
+        }
+
+        const isMatch = await admin.comparePassword(password);
+        if (!isMatch) {
+            console.log('Login failed: Incorrect password', { email });
+            return res.status(401).json({ message: 'Invalid email or password', error: 'Unauthorized' });
         }
 
         admin.lastLogin = new Date();
         await admin.save();
-        console.log('Admin lastLogin updated:', email);
+        console.log('Admin lastLogin updated', { email });
 
-        const token = jwt.sign({ adminId: admin._id }, process.env.JWT_SECRET || 'your-secret-key', {
-            expiresIn: '1h'
-        });
-        console.log('Token generated for admin:', email);
+        const token = jwt.sign({ adminId: admin._id }, process.env.JWT_SECRET || 'your-secret-key', { expiresIn: '1h' });
+        console.log('Token generated', { email, token: token.slice(0, 10) + '...' });
 
         await AuditLog.create({
             adminId: admin._id,
@@ -57,11 +61,11 @@ router.post('/loginAdmin', async (req, res) => {
             ipAddress: req.ip || 'unknown',
             details: `Admin ${email} logged in`
         });
-        console.log('Audit log created for login:', email);
+        console.log('Audit log created for login', { email });
 
         res.json({ token });
     } catch (error) {
-        console.error('Admin login error:', error);
+        console.error('Admin login error', { email, error: error.message });
         res.status(500).json({ message: 'Server error during login', error: error.message });
     }
 });
@@ -72,54 +76,26 @@ router.use(adminAuthMiddleware);
 // Fetch all GDPR data with optional search/filter
 router.get('/gdpr-data', async (req, res) => {
     const { consentId, ipAddress } = req.query;
-    console.log('Fetching GDPR data with query:', { consentId, ipAddress });
+    console.log('Fetching GDPR data', { consentId, ipAddress });
 
     try {
-        // Build the aggregation pipeline dynamically
         const pipeline = [];
-
-        // Add $match stage only if filters are provided
         const matchConditions = {};
         if (consentId) matchConditions.consentId = consentId;
-        if (Object.keys(matchConditions).length > 0) {
-            pipeline.push({ $match: matchConditions });
-        }
+        if (Object.keys(matchConditions).length > 0) pipeline.push({ $match: matchConditions });
 
-        // Add lookups for location and user data
         pipeline.push(
-            {
-                $lookup: {
-                    from: 'locations',
-                    localField: 'consentId',
-                    foreignField: 'consentId',
-                    as: 'location'
-                }
-            },
-            {
-                $lookup: {
-                    from: 'users',
-                    localField: 'consentId',
-                    foreignField: 'consentId',
-                    as: 'user'
-                }
-            }
+            { $lookup: { from: 'locations', localField: 'consentId', foreignField: 'consentId', as: 'location' } },
+            { $lookup: { from: 'users', localField: 'consentId', foreignField: 'consentId', as: 'user' } }
         );
 
-        // Add additional $match for ipAddress after lookup (since it's in the location array)
-        if (ipAddress) {
-            pipeline.push({ $match: { 'location.ipAddress': ipAddress } });
-        }
+        if (ipAddress) pipeline.push({ $match: { 'location.ipAddress': ipAddress } });
 
-        // Project the desired fields
         pipeline.push({
             $project: {
                 consentId: 1,
                 preferences: 1,
-                'timestamps.cookiePreferences': {
-                    createdAt: '$createdAt',
-                    updatedAt: '$updatedAt',
-                    deletedAt: '$deletedAt'
-                },
+                'timestamps.cookiePreferences': { createdAt: '$createdAt', updatedAt: '$updatedAt', deletedAt: '$deletedAt' },
                 ipAddress: { $arrayElemAt: ['$location.ipAddress', 0] },
                 isp: { $arrayElemAt: ['$location.isp', 0] },
                 city: { $arrayElemAt: ['$location.city', 0] },
@@ -136,6 +112,7 @@ router.get('/gdpr-data', async (req, res) => {
         });
 
         const data = await CookiePreferences.aggregate(pipeline);
+        console.log('GDPR data fetched', { count: data.length, consentId, ipAddress });
 
         await AuditLog.create({
             adminId: req.adminId,
@@ -146,44 +123,26 @@ router.get('/gdpr-data', async (req, res) => {
 
         res.json(data.length === 0 ? [] : data);
     } catch (error) {
-        console.error('Error fetching GDPR data:', error);
-        res.status(500).json({ error: 'Failed to fetch GDPR data', details: error.message });
+        console.error('Error fetching GDPR data', { consentId, ipAddress, error: error.message });
+        res.status(500).json({ message: 'Failed to fetch GDPR data', error: error.message });
     }
 });
 
 // Fetch GDPR data by consentId (exact match)
 router.get('/gdpr-data/:consentId', async (req, res) => {
     const { consentId } = req.params;
-    console.log('Fetching GDPR data for consentId:', consentId);
+    console.log('Fetching GDPR data by consentId', { consentId });
 
     try {
         const data = await CookiePreferences.aggregate([
             { $match: { consentId } },
-            {
-                $lookup: {
-                    from: 'locations',
-                    localField: 'consentId',
-                    foreignField: 'consentId',
-                    as: 'location'
-                }
-            },
-            {
-                $lookup: {
-                    from: 'users',
-                    localField: 'consentId',
-                    foreignField: 'consentId',
-                    as: 'user'
-                }
-            },
+            { $lookup: { from: 'locations', localField: 'consentId', foreignField: 'consentId', as: 'location' } },
+            { $lookup: { from: 'users', localField: 'consentId', foreignField: 'consentId', as: 'user' } },
             {
                 $project: {
                     consentId: 1,
                     preferences: 1,
-                    'timestamps.cookiePreferences': {
-                        createdAt: '$createdAt',
-                        updatedAt: '$updatedAt',
-                        deletedAt: '$deletedAt'
-                    },
+                    'timestamps.cookiePreferences': { createdAt: '$createdAt', updatedAt: '$updatedAt', deletedAt: '$deletedAt' },
                     ipAddress: { $arrayElemAt: ['$location.ipAddress', 0] },
                     isp: { $arrayElemAt: ['$location.isp', 0] },
                     city: { $arrayElemAt: ['$location.city', 0] },
@@ -200,10 +159,11 @@ router.get('/gdpr-data/:consentId', async (req, res) => {
             }
         ]);
 
+        console.log('GDPR data fetched by consentId', { consentId, found: data.length > 0 });
+
         await AuditLog.create({
             adminId: req.adminId,
             action: 'data-fetch',
-            consentId,
             ipAddress: req.ip || 'unknown',
             details: `Fetched GDPR data for consentId: ${consentId}`
         });
@@ -211,11 +171,11 @@ router.get('/gdpr-data/:consentId', async (req, res) => {
         if (data.length > 0) {
             res.json(data[0]);
         } else {
-            res.status(404).json({ message: 'No data found for this consent ID' });
+            res.status(404).json({ message: `No data found for consentId: ${consentId}`, error: 'Not Found' });
         }
     } catch (error) {
-        console.error('Error fetching GDPR data for consentId:', consentId, error);
-        res.status(500).json({ error: 'Failed to fetch GDPR data', details: error.message });
+        console.error('Error fetching GDPR data by consentId', { consentId, error: error.message });
+        res.status(500).json({ message: 'Failed to fetch GDPR data', error: error.message });
     }
 });
 
@@ -228,32 +188,35 @@ router.post('/logoutAdmin', async (req, res) => {
             ipAddress: req.ip || 'unknown',
             details: 'Admin logged out'
         });
+        console.log('Admin logged out', { adminId: req.adminId });
         res.json({ message: 'Logged out successfully' });
     } catch (error) {
-        console.error('Error logging out:', error);
-        res.status(500).json({ message: 'Logout failed' });
+        console.error('Error during logout', { adminId: req.adminId, error: error.message });
+        res.status(500).json({ message: 'Logout failed', error: error.message });
     }
 });
 
-// Seed default admin user
-const seedAdmin = async () => {
-    try {
-        const existingAdmin = await Admin.findOne({ email: 'venkatsaikarthi@gmail.com' });
-        if (!existingAdmin) {
-            const admin = new Admin({
-                username: 'venkatsaikarthi',
-                email: 'venkatsaikarthi@gmail.com',
-                password: '22337044'
-            });
-            await admin.save();
-            console.log('Default admin created: venkatsaikarthi@gmail.com / 22337044');
-        } else {
-            console.log('Default admin already exists:', existingAdmin.email);
+// Seed default admin user (only in development or on first run)
+if (process.env.NODE_ENV !== 'production') {
+    const seedAdmin = async () => {
+        try {
+            const existingAdmin = await Admin.findOne({ email: 'venkatsaikarthi@gmail.com' });
+            if (!existingAdmin) {
+                const admin = new Admin({
+                    username: 'venkatsaikarthi',
+                    email: 'venkatsaikarthi@gmail.com',
+                    password: '22337044'
+                });
+                await admin.save();
+                console.log('Default admin created: venkatsaikarthi@gmail.com / 22337044');
+            } else {
+                console.log('Default admin already exists:', existingAdmin.email);
+            }
+        } catch (error) {
+            console.error('Error seeding default admin:', error.message);
         }
-    } catch (error) {
-        console.error('Error seeding default admin:', error);
-    }
-};
-seedAdmin();
+    };
+    seedAdmin();
+}
 
 module.exports = router;

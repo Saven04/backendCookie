@@ -71,16 +71,22 @@ router.use(adminAuthMiddleware);
 
 // Fetch all GDPR data with optional search/filter
 router.get('/gdpr-data', async (req, res) => {
-    const { consentId, ipAddress } = req.query; // Support query params for search
+    const { consentId, ipAddress } = req.query;
     console.log('Fetching GDPR data with query:', { consentId, ipAddress });
 
     try {
-        let matchStage = {};
-        if (consentId) matchStage.consentId = consentId;
-        if (ipAddress) matchStage['location.ipAddress'] = ipAddress;
+        // Build the aggregation pipeline dynamically
+        const pipeline = [];
 
-        const data = await CookiePreferences.aggregate([
-            matchStage.consentId ? { $match: { consentId } } : {}, // Only match if consentId provided
+        // Add $match stage only if filters are provided
+        const matchConditions = {};
+        if (consentId) matchConditions.consentId = consentId;
+        if (Object.keys(matchConditions).length > 0) {
+            pipeline.push({ $match: matchConditions });
+        }
+
+        // Add lookups for location and user data
+        pipeline.push(
             {
                 $lookup: {
                     from: 'locations',
@@ -96,32 +102,40 @@ router.get('/gdpr-data', async (req, res) => {
                     foreignField: 'consentId',
                     as: 'user'
                 }
-            },
-            matchStage['location.ipAddress'] ? { $match: { 'location.ipAddress': ipAddress } } : {}, // Match IP if provided
-            {
-                $project: {
-                    consentId: 1,
-                    preferences: 1,
-                    'timestamps.cookiePreferences': {
-                        createdAt: '$createdAt',
-                        updatedAt: '$updatedAt',
-                        deletedAt: '$deletedAt'
-                    },
-                    ipAddress: { $arrayElemAt: ['$location.ipAddress', 0] },
-                    isp: { $arrayElemAt: ['$location.isp', 0] },
-                    city: { $arrayElemAt: ['$location.city', 0] },
-                    country: { $arrayElemAt: ['$location.country', 0] },
-                    purpose: { $arrayElemAt: ['$location.purpose', 0] },
-                    consentStatus: { $arrayElemAt: ['$location.consentStatus', 0] },
-                    'timestamps.location': {
-                        createdAt: { $arrayElemAt: ['$location.createdAt', 0] },
-                        updatedAt: { $arrayElemAt: ['$location.updatedAt', 0] },
-                        deletedAt: { $arrayElemAt: ['$location.deletedAt', 0] }
-                    },
-                    username: { $arrayElemAt: ['$user.username', 0] }
-                }
             }
-        ]);
+        );
+
+        // Add additional $match for ipAddress after lookup (since it's in the location array)
+        if (ipAddress) {
+            pipeline.push({ $match: { 'location.ipAddress': ipAddress } });
+        }
+
+        // Project the desired fields
+        pipeline.push({
+            $project: {
+                consentId: 1,
+                preferences: 1,
+                'timestamps.cookiePreferences': {
+                    createdAt: '$createdAt',
+                    updatedAt: '$updatedAt',
+                    deletedAt: '$deletedAt'
+                },
+                ipAddress: { $arrayElemAt: ['$location.ipAddress', 0] },
+                isp: { $arrayElemAt: ['$location.isp', 0] },
+                city: { $arrayElemAt: ['$location.city', 0] },
+                country: { $arrayElemAt: ['$location.country', 0] },
+                purpose: { $arrayElemAt: ['$location.purpose', 0] },
+                consentStatus: { $arrayElemAt: ['$location.consentStatus', 0] },
+                'timestamps.location': {
+                    createdAt: { $arrayElemAt: ['$location.createdAt', 0] },
+                    updatedAt: { $arrayElemAt: ['$location.updatedAt', 0] },
+                    deletedAt: { $arrayElemAt: ['$location.deletedAt', 0] }
+                },
+                username: { $arrayElemAt: ['$user.username', 0] }
+            }
+        });
+
+        const data = await CookiePreferences.aggregate(pipeline);
 
         await AuditLog.create({
             adminId: req.adminId,
